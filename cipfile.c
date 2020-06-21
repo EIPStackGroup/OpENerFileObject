@@ -111,8 +111,7 @@ void GenerateFileInitiateUploadHeader(
   InitializeENIPMessage(&message_router_response->message);
   message_router_response->reply_service =
     (0x80 | message_router_request->service);
-  message_router_response->general_status =
-    kCipFileInitiateExtendedStatusFileEmpty;
+  message_router_response->general_status = general_status;
   message_router_response->additional_status[0] = additional_status_code;
   message_router_response->size_of_additional_status = additional_status_size;
 }
@@ -325,7 +324,7 @@ EipStatus CipFileInitiateUpload(CipInstance *RESTRICT const instance,
       break;
     case kCipFileStateFileLoaded:
       /* Insert Happy Path */
-      GenerateFileInitiateUploadHeader(kCipErrorObjectStateConflict,
+      GenerateFileInitiateUploadHeader(kCipErrorSuccess,
                                        0,
                                        0,
                                        message_router_request,
@@ -336,7 +335,7 @@ EipStatus CipFileInitiateUpload(CipInstance *RESTRICT const instance,
       break;
     case kCipFileStateTransferUploadedInitiated:
       /* Insert Happy Path */
-      GenerateFileInitiateUploadHeader(kCipErrorObjectStateConflict,
+      GenerateFileInitiateUploadHeader(kCipErrorSuccess,
                                        0,
                                        0,
                                        message_router_request,
@@ -347,7 +346,7 @@ EipStatus CipFileInitiateUpload(CipInstance *RESTRICT const instance,
       break;
     case kCipFileStateTransferUploadInProgress:
       /* Insert Happy Path */
-      GenerateFileInitiateUploadHeader(kCipErrorObjectStateConflict,
+      GenerateFileInitiateUploadHeader(kCipErrorSuccess,
                                        0,
                                        0,
                                        message_router_request,
@@ -417,7 +416,7 @@ EipStatus CipFileUploadTransfer(CipInstance *RESTRICT const instance,
       break;
     case kCipFileStateTransferUploadedInitiated:
       /* Insert Happy Path */
-      GenerateFileInitiateUploadHeader(kCipErrorObjectStateConflict,
+      GenerateFileInitiateUploadHeader(kCipErrorSuccess,
                                        0,
                                        0,
                                        message_router_request,
@@ -428,7 +427,7 @@ EipStatus CipFileUploadTransfer(CipInstance *RESTRICT const instance,
       break;
     case kCipFileStateTransferUploadInProgress:
       /* Insert Happy Path */
-      GenerateFileInitiateUploadHeader(kCipErrorObjectStateConflict,
+      GenerateFileInitiateUploadHeader(kCipErrorSuccess,
                                        0,
                                        0,
                                        message_router_request,
