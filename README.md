@@ -19,7 +19,7 @@ Now, that the object is included into the compile process, you have to use the f
 ```
 EipStatus eip_status = CipStackInit(unique_connection_id);
 eip_status = CipFileInit();
-OPENER_ASSERT(kEipStatusOk == eip_status)
+OPENER_ASSERT(kEipStatusOk == eip_status);
 ```
 
 also do not forget to add the header `#include "cipfile.h"`
