@@ -21,20 +21,6 @@ typedef struct cip_file_object_file_revision {
     CipUsint minor_revision;
 } CipFileObjectFileRevision;
 
-/** @brief Valid values for CIP File Object State
- *
- */
-typedef enum cip_file_object_state_values {
-  kCipFileStateNonExistent = 0,
-  kCipFileStateFileEmpty,
-  kCipFileStateFileLoaded,
-  kCipFileStateTransferUploadedInitiated,
-  kCipFileStateTransferDownloadInitiated,
-  kCipFileStateTransferUploadInProgress,
-  kCipFileStateTransferDownloadInProgress,
-  kCipFileStateStoring
-} CipFileStateValue;
-
 typedef enum cip_file_object_invokation_method_values {
   kCipFileInvocationMethodNoAction = 0,
   kCipFileInvocationMethodResetToIdentityObject,
