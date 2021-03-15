@@ -57,6 +57,8 @@ typedef enum cip_file_transfer_packet_type {
   kCipFileTransferPacketTypeFirstAndLastPacket = 4
 } CipFileTransferPacketType;
 
+typedef struct cip_file_upload_session CipFileObjectUploadSession;
+
 typedef struct cip_file_object_values {
     CipUsint state; /**< Valid values are the ones in @ref CipFileStateValue*/
     CipStringI instance_name;
@@ -71,9 +73,7 @@ typedef struct cip_file_object_values {
     CipUsint file_encoding_format;
     /* Non CIP values */
     FILE *file_handle; /* TODO: Make platform independent */
-    size_t last_send_size;
-    CipUsint negotiated_transfer_size;
-    CipUsint transfer_number;
+    CipFileObjectUploadSession *aquired_session;
 } CipFileObjectValues;
 
 EipStatus CipFileInit(void);
