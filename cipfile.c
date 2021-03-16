@@ -16,6 +16,7 @@
 #include "trace.h"
 
 #define STATIC_FILE_OBJECT_NUMBER_OF_INSTANCES 1
+#define CIP_FILE_OBJECT_DEFAULT_TIMEOUT 10U
 
 static CipClass *file_object_class = NULL;
 
@@ -32,9 +33,11 @@ static const CipUint kCipFileEDSAndIconFileInstanceNumber = 0xC8U;
 
 typedef struct cip_file_upload_session {
   bool inUse;
+  CipFileObjectValues *associated_instance;
   size_t last_send_size;
   CipUsint negotiated_transfer_size;
   CipUsint transfer_number;
+  uint_fast64_t session_timeout_milliseconds;
 } CipFileObjectUploadSession;
 
 static CipFileObjectUploadSession upload_sessions[CIP_FILE_UPLOAD_SESSIONS];
@@ -100,16 +103,45 @@ void CipFileInitializeUploadSessions() {
   memset(upload_sessions, 0, sizeof(CipFileObjectUploadSession) * CIP_FILE_UPLOAD_SESSIONS);
 }
 
-void CipFileTakeUploadSession(CipFileObjectValues *const struct_to_instance, CipFileObjectUploadSession *const session) {
-  struct_to_instance->aquired_session = session;
-  session->inUse = true;
+void CipFileResetTimeout(CipFileObjectUploadSession *const session) {
+  session->session_timeout_milliseconds = session->associated_instance->file_transfer_timeout * 1000ULL; /* seconds to milliseconds */
 }
 
 void CipFileReleaseUploadSession(CipFileObjectValues *const struct_to_instance) {
   if(NULL != struct_to_instance->aquired_session) {
-    struct_to_instance->aquired_session->inUse = false;
+    memset(struct_to_instance->aquired_session, 0, sizeof(CipFileObjectUploadSession));
     struct_to_instance->aquired_session = NULL;
   }
+}
+
+void CipFileTimeoutSession(CipFileObjectUploadSession *const session) {
+  CipFileObjectValues *const struct_to_instance = session->associated_instance;
+  OPENER_TRACE_INFO("Upload session timed out\n");
+  if(NULL != struct_to_instance->file_handle) {
+    rewind(struct_to_instance->file_handle);
+  }
+  CipFileReleaseUploadSession(struct_to_instance);
+  struct_to_instance->state = kCipFileObjectStateFileLoaded;
+}
+
+void CipFileSessionTimerCheck(const MilliSeconds elapsed_time) {
+  for(size_t i = 0; i < CIP_FILE_UPLOAD_SESSIONS; ++i) {
+    if(upload_sessions[i].inUse) {
+      if(elapsed_time > upload_sessions[i].session_timeout_milliseconds) {
+        OPENER_TRACE_INFO("Time left %" PRIu64 "\n", upload_sessions[i].session_timeout_milliseconds);
+        CipFileTimeoutSession(&upload_sessions[i]);
+      } else {
+        upload_sessions[i].session_timeout_milliseconds -= elapsed_time;
+      }
+    }
+  }
+}
+
+void CipFileTakeUploadSession(CipFileObjectValues *const struct_to_instance, CipFileObjectUploadSession *const session) {
+  struct_to_instance->aquired_session = session;
+  session->inUse = true;
+  session->associated_instance = struct_to_instance;
+  CipFileResetTimeout(session);
 }
 
 void CipFileEncodeFileRevision(const void *const data, ENIPMessage *const outgoing_message) {
@@ -205,15 +237,17 @@ static CipFileObjectState TransferUploadFromInitiateUpload(CipInstance *RESTRICT
   CipFileObjectUploadSession *upload_session = struct_to_instance->aquired_session;
 
   CipUsint received_transfer_number = GetSintFromMessage(&message_router_request->data);
-  if(upload_session->transfer_number != received_transfer_number) {
+  if(0 != received_transfer_number) {
     message_router_response->general_status = kCipErrorInvalidParameter;
     message_router_response->size_of_additional_status = 1;
     message_router_response->additional_status[0] = kCipFileTransferExtendedStatusFailOnTransferOutOfSequence;
     return kCipFileObjectStateTransferUploadInProgress;
   }
 
+  CipFileResetTimeout(upload_session);
+
   EncodeCipUsint(&received_transfer_number, &message_router_response->message);
-  upload_session->transfer_number++;
+  upload_session->transfer_number = 1; // Had to start with 0, so the next must be 1
 
   CipUsint transfer_packet_type = kCipFileTransferPacketTypeFirstTransferPacket;
   CipOctet data_to_send[CIP_FILE_OBJECT_MAXIMUM_TRANSFER_SIZE] = { 0 };
@@ -224,8 +258,8 @@ static CipFileObjectState TransferUploadFromInitiateUpload(CipInstance *RESTRICT
   }
   if(negotiated_transfer_size > data_send_length) {
     transfer_packet_type = kCipFileTransferPacketTypeFirstAndLastPacket;
-    rewind(struct_to_instance->file_handle);
   }
+
   EncodeCipUsint(&transfer_packet_type, &message_router_response->message);
   memcpy(message_router_response->message.current_message_position, data_to_send, data_send_length);
   message_router_response->message.current_message_position += data_send_length;
@@ -233,6 +267,7 @@ static CipFileObjectState TransferUploadFromInitiateUpload(CipInstance *RESTRICT
 
   if(kCipFileTransferPacketTypeFirstAndLastPacket == transfer_packet_type) {
     EncodeCipInt(&struct_to_instance->file_checksum, &message_router_response->message);
+    rewind(struct_to_instance->file_handle);
     CipFileReleaseUploadSession(struct_to_instance);
     return kCipFileObjectStateFileLoaded;
   }
@@ -255,6 +290,8 @@ static CipFileObjectState TransferUpload(CipInstance *RESTRICT const instance, C
     message_router_response->additional_status[0] = kCipFileTransferExtendedStatusFailOnTransferOutOfSequence;
     return kCipFileObjectStateTransferUploadInProgress;
   }
+
+  CipFileResetTimeout(upload_session); //Only update on correct sequence number
 
   if(upload_session->transfer_number - 1 == received_transfer_number) {
     upload_session->transfer_number--;
@@ -280,6 +317,7 @@ static CipFileObjectState TransferUpload(CipInstance *RESTRICT const instance, C
   message_router_response->message.used_message_length += data_send_length;
 
   if(kCipFileTransferPacketTypeLastTransferPacket == transfer_packet_type) {
+    OPENER_TRACE_INFO("Last transfer packet\n");
     EncodeCipInt(&struct_to_instance->file_checksum, &message_router_response->message);
     rewind(struct_to_instance->file_handle);
     CipFileReleaseUploadSession(struct_to_instance);
@@ -320,9 +358,7 @@ EipStatus CipFileInitiateUpload(CipInstance *RESTRICT const instance, CipMessage
       GenerateFileInitiateUploadHeader(kCipErrorObjectStateConflict, 1, *state, message_router_request, message_router_response);
       break;
     case kCipFileObjectStateTransferUploadInProgress:
-      /* Insert Happy Path */
-      GenerateFileInitiateUploadHeader(kCipErrorSuccess, 0, 0, message_router_request, message_router_response);
-      *state = InitiateUpload(instance, message_router_request, message_router_response);
+      GenerateFileInitiateUploadHeader(kCipErrorObjectStateConflict, 1, *state, message_router_request, message_router_response);
       break;
     default:
       OPENER_TRACE_ERR("Unknown state in File Object instance: %d", instance->instance_number);
@@ -387,6 +423,9 @@ EipStatus CreateFileObject(unsigned int instance_nr) {
   InsertAttribute(instance, 9, kCipByte, EncodeCipByte, &eds_file_instance->file_save_parameters, kGetableSingle);
   InsertAttribute(instance, 10, kCipUsint, EncodeCipUsint, &eds_file_instance->file_access_rule, kGetableSingle);
   InsertAttribute(instance, 11, kCipUsint, EncodeCipUsint, &eds_file_instance->file_encoding_format, kGetableSingle);
+  InsertAttribute(instance, 12, kCipUsint, EncodeCipUsint, &eds_file_instance->file_transfer_timeout, kSetAndGetAble);
+  /* Default values*/
+  eds_file_instance->file_transfer_timeout = CIP_FILE_OBJECT_DEFAULT_TIMEOUT;
   return kEipStatusOk;
 }
 
@@ -471,8 +510,8 @@ EipStatus CipFileCreateEDSAndIconFileInstance() {
   memcpy(file_name_short_string->string, file_name_string, sizeof(file_name_string));
 
   InsertService(file_object_class, kGetAttributeSingle, &GetAttributeSingle, "GetAttributeSingle");
-  InsertService(file_object_class, kCipFileObjectInitiateUploadServiceCode, &CipFileInitiateUpload, "CipFileObjectGetAttributeSingleClass");
-  InsertService(file_object_class, kCipFileObjectUploadTransferServiceCode, &CipFileUploadTransfer, "CipFileObjectGetAttributeSingleClass");
+  InsertService(file_object_class, kCipFileObjectInitiateUploadServiceCode, &CipFileInitiateUpload, "CipFileObjectInitiateUploadServiceCode");
+  InsertService(file_object_class, kCipFileObjectUploadTransferServiceCode, &CipFileUploadTransfer, "CipFileObjectUploadTransferServiceCode");
 
   return kEipStatusOk;
 }
@@ -481,10 +520,10 @@ EipStatus CipFileInit() {
   if(NULL == (file_object_class = CreateCipClass(kCipFileObjectClassCode, 7, /* # class attributes */
   32, /* # highest class attribute number */
   1, /* # class services */
-  11, /* # instance attributes */
-  11, /* # highest instance attribute number */
+  12, /* # instance attributes */
+  12, /* # highest instance attribute number */
   3, /* # instance services */
-  0, /* # instances - zero to supress creation */
+  0, /* # instances - zero to suppress creation */
   "File Object", /* # debug name */
   3, /* # class revision */
   CipFileInitializeClassSettings /* # function pointer for initialization */

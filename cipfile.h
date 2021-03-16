@@ -71,11 +71,14 @@ typedef struct cip_file_object_values {
     CipByte file_save_parameters;
     CipUsint file_access_rule;
     CipUsint file_encoding_format;
+    CipUsint file_transfer_timeout;
     /* Non CIP values */
     FILE *file_handle; /* TODO: Make platform independent */
     CipFileObjectUploadSession *aquired_session;
 } CipFileObjectValues;
 
 EipStatus CipFileInit(void);
+
+void CipFileSessionTimerCheck(const MilliSeconds elapsed_time);
 
 #endif /* OPENER_CIPFILE_H_ */
