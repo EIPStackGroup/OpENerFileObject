@@ -154,7 +154,7 @@ void EncodeCipFileObjectDirectory(const void *const data, ENIPMessage *const out
   const CipInstance *const class_instance = GetCipInstance(file_object_class, 0); /* Get class instance */
   CipAttributeStruct *instance_number = GetCipAttribute(class_instance, 3);
   CipUint number_of_instances = *(CipUint*) instance_number->data;
-  for(size_t i = 1; i <= number_of_instances; ++i) {
+  for(CipUint i = 1; i <= number_of_instances; ++i) {
     CipInstance *instance = GetCipInstance(file_object_class, i); /* Get class instance */
     if(NULL == instance) {
       continue;
