@@ -412,18 +412,18 @@ EipStatus CipFileUploadTransfer(CipInstance *RESTRICT const instance, CipMessage
 EipStatus CreateFileObject(unsigned int instance_nr) {
   CipInstance *instance = GetCipInstance(file_object_class, instance_nr);
 
-  InsertAttribute(instance, 1, kCipUsint, EncodeCipUsint, &eds_file_instance->state, kGetableSingle);
-  InsertAttribute(instance, 2, kCipStringI, EncodeCipStringI, &eds_file_instance->instance_name, kGetableSingle);
-  InsertAttribute(instance, 3, kCipUint, EncodeCipUint, &eds_file_instance->file_format_version, kGetableSingle);
-  InsertAttribute(instance, 4, kCipAny, EncodeCipStringI, &eds_file_instance->file_name, kGetableSingle);
-  InsertAttribute(instance, 5, kCipAny, CipFileEncodeFileRevision, &eds_file_instance->file_revision, kGetableSingle);
-  InsertAttribute(instance, 6, kCipUdint, EncodeCipUdint, &eds_file_instance->file_size, kGetableSingle);
-  InsertAttribute(instance, 7, kCipUint, EncodeCipUint, &eds_file_instance->file_checksum, kGetableSingle);
-  InsertAttribute(instance, 8, kCipUsint, EncodeCipUsint, &eds_file_instance->invocation_method, kGetableSingle);
-  InsertAttribute(instance, 9, kCipByte, EncodeCipByte, &eds_file_instance->file_save_parameters, kGetableSingle);
-  InsertAttribute(instance, 10, kCipUsint, EncodeCipUsint, &eds_file_instance->file_access_rule, kGetableSingle);
-  InsertAttribute(instance, 11, kCipUsint, EncodeCipUsint, &eds_file_instance->file_encoding_format, kGetableSingle);
-  InsertAttribute(instance, 12, kCipUsint, EncodeCipUsint, &eds_file_instance->file_transfer_timeout, kSetAndGetAble);
+  InsertAttribute(instance, 1, kCipUsint, EncodeCipUsint, NULL, &eds_file_instance->state, kGetableSingle);
+  InsertAttribute(instance, 2, kCipStringI, EncodeCipStringI, NULL, &eds_file_instance->instance_name, kGetableSingle);
+  InsertAttribute(instance, 3, kCipUint, EncodeCipUint, NULL, &eds_file_instance->file_format_version, kGetableSingle);
+  InsertAttribute(instance, 4, kCipAny, EncodeCipStringI, NULL, &eds_file_instance->file_name, kGetableSingle);
+  InsertAttribute(instance, 5, kCipAny, CipFileEncodeFileRevision, NULL, &eds_file_instance->file_revision, kGetableSingle);
+  InsertAttribute(instance, 6, kCipUdint, EncodeCipUdint, NULL, &eds_file_instance->file_size, kGetableSingle);
+  InsertAttribute(instance, 7, kCipUint, EncodeCipUint, NULL, &eds_file_instance->file_checksum, kGetableSingle);
+  InsertAttribute(instance, 8, kCipUsint, EncodeCipUsint, NULL, &eds_file_instance->invocation_method, kGetableSingle);
+  InsertAttribute(instance, 9, kCipByte, EncodeCipByte, NULL, &eds_file_instance->file_save_parameters, kGetableSingle);
+  InsertAttribute(instance, 10, kCipUsint, EncodeCipUsint, NULL, &eds_file_instance->file_access_rule, kGetableSingle);
+  InsertAttribute(instance, 11, kCipUsint, EncodeCipUsint, NULL, &eds_file_instance->file_encoding_format, kGetableSingle);
+  InsertAttribute(instance, 12, kCipUsint, EncodeCipUsint, NULL, &eds_file_instance->file_transfer_timeout, kSetAndGetAble);
   /* Default values*/
   eds_file_instance->file_transfer_timeout = CIP_FILE_OBJECT_DEFAULT_TIMEOUT;
   return kEipStatusOk;
@@ -432,14 +432,14 @@ EipStatus CreateFileObject(unsigned int instance_nr) {
 void CipFileInitializeClassSettings(CipClass *cip_class) {
   CipClass *meta_class = cip_class->class_instance.cip_class;
 
-  InsertAttribute((CipInstance*) cip_class, 1, kCipUint, EncodeCipUint, (void*) &cip_class->revision, kGetableSingleAndAll); /* revision */
-  InsertAttribute((CipInstance*) cip_class, 2, kCipUint, EncodeCipUint, (void*) &cip_class->number_of_instances, kGetableSingleAndAll); /*  largest instance number */
-  InsertAttribute((CipInstance*) cip_class, 3, kCipUint, EncodeCipUint, (void*) &cip_class->number_of_instances, kGetableSingleAndAll); /* number of instances currently existing*/
-  InsertAttribute((CipInstance*) cip_class, 4, kCipUint, EncodeCipUint, (void*) &kCipUintZero, kGetableAll); /* optional attribute list - default = 0 */
-  InsertAttribute((CipInstance*) cip_class, 5, kCipUint, EncodeCipUint, (void*) &kCipUintZero, kNotSetOrGetable); /* optional service list - default = 0 */
-  InsertAttribute((CipInstance*) cip_class, 6, kCipUint, EncodeCipUint, (void*) &meta_class->highest_attribute_number, kGetableSingle); /* max class attribute number*/
-  InsertAttribute((CipInstance*) cip_class, 7, kCipUint, EncodeCipUint, (void*) &cip_class->highest_attribute_number, kGetableSingle); /* max instance attribute number*/
-  InsertAttribute((CipInstance*) cip_class, 32, kCipAny, EncodeCipFileObjectDirectory, &dummy_attribute, kGetableSingle);
+  InsertAttribute((CipInstance*) cip_class, 1, kCipUint, EncodeCipUint, NULL, (void*) &cip_class->revision, kGetableSingleAndAll); /* revision */
+  InsertAttribute((CipInstance*) cip_class, 2, kCipUint, EncodeCipUint, NULL, (void*) &cip_class->number_of_instances, kGetableSingleAndAll); /*  largest instance number */
+  InsertAttribute((CipInstance*) cip_class, 3, kCipUint, EncodeCipUint, NULL, (void*) &cip_class->number_of_instances, kGetableSingleAndAll); /* number of instances currently existing*/
+  InsertAttribute((CipInstance*) cip_class, 4, kCipUint, EncodeCipUint, NULL, (void*) &kCipUintZero, kGetableAll); /* optional attribute list - default = 0 */
+  InsertAttribute((CipInstance*) cip_class, 5, kCipUint, EncodeCipUint, NULL, (void*) &kCipUintZero, kNotSetOrGetable); /* optional service list - default = 0 */
+  InsertAttribute((CipInstance*) cip_class, 6, kCipUint, EncodeCipUint, NULL, (void*) &meta_class->highest_attribute_number, kGetableSingle); /* max class attribute number*/
+  InsertAttribute((CipInstance*) cip_class, 7, kCipUint, EncodeCipUint, NULL, (void*) &cip_class->highest_attribute_number, kGetableSingle); /* max instance attribute number*/
+  InsertAttribute((CipInstance*) cip_class, 32, kCipAny, EncodeCipFileObjectDirectory, NULL, &dummy_attribute, kGetableSingle);
 
   InsertService(meta_class, kGetAttributeSingle, &GetAttributeSingle, "GetAttributeSingle");
 
