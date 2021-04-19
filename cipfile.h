@@ -17,23 +17,9 @@ static const CipUint kCipFileObjectInitiateUploadServiceCode = 0x4BU;
 static const CipUint kCipFileObjectUploadTransferServiceCode = 0x4FU;
 
 typedef struct cip_file_object_file_revision {
-  CipUsint major_revision;
-  CipUsint minor_revision;
+    CipUsint major_revision;
+    CipUsint minor_revision;
 } CipFileObjectFileRevision;
-
-/** @brief Valid values for CIP File Object State
- *
- */
-typedef enum cip_file_object_state_values {
-  kCipFileStateNonExistent = 0,
-  kCipFileStateFileEmpty,
-  kCipFileStateFileLoaded,
-  kCipFileStateTransferUploadedInitiated,
-  kCipFileStateTransferDownloadInitiated,
-  kCipFileStateTransferUploadInProgress,
-  kCipFileStateTransferDownloadInProgress,
-  kCipFileStateStoring
-} CipFileStateValue;
 
 typedef enum cip_file_object_invokation_method_values {
   kCipFileInvocationMethodNoAction = 0,
@@ -51,7 +37,15 @@ typedef enum cip_file_object_file_access_rule {
 
 typedef enum cip_file_object_file_encoding_format {
   kCipFileObjectFileEncodinfFormatBinary = 0,
-  kCipFileObjectFileEncodinfFormatCompressedFile = 1,
+  kCipFileObjectFileEncodinfFormatCompressedFile = 1, /*<< ZLIB compression */
+  kCipFileObjectFileEncodinfFormatPEMEncodedCertificate = 2,
+  kCipFileObjectFileEncodinfFormatPKCS7EncodedCertificate = 3,
+  kCipFileObjectFileEncodinfFormatPEMEncodedCRL = 4,
+  kCipFileObjectFileEncodinfFormatPKS7EncodedCRL = 5,
+  kCipFileObjectFileEncodinfFormatASCIIText = 11,
+  kCipFileObjectFileEncodinfFormatWord = 12, /*<< doc, docx */
+  kCipFileObjectFileEncodinfFormatExcel = 13, /*<< xls, xlsx */
+  kCipFileObjectFileEncodinfFormatPDF = 14, /*<< pdf */
   kCipFileObjectFileEncodinfFormatUnkown = 255
 } CipFileObjectFileEncodingFormat;
 
@@ -63,25 +57,28 @@ typedef enum cip_file_transfer_packet_type {
   kCipFileTransferPacketTypeFirstAndLastPacket = 4
 } CipFileTransferPacketType;
 
+typedef struct cip_file_upload_session CipFileObjectUploadSession;
+
 typedef struct cip_file_object_values {
-  CipUsint state; /**< Valid values are the ones in @ref CipFileStateValue*/
-  CipStringI instance_name;
-  CipUint file_format_version;
-  CipStringI file_name;
-  CipFileObjectFileRevision file_revision;
-  CipUdint file_size;
-  CipUint file_checksum;
-  CipUsint invocation_method;
-  CipByte file_save_parameters;
-  CipUsint file_access_rule;
-  CipUsint file_encoding_format;
-  /* Non CIP values */
-  FILE *file_handle; /* TODO: Make platform independent */
-  size_t last_send_size;
-  CipUsint negotiated_transfer_size;
-  CipUsint transfer_number;
+    CipUsint state; /**< Valid values are the ones in @ref CipFileStateValue*/
+    CipStringI instance_name;
+    CipUint file_format_version;
+    CipStringI file_name;
+    CipFileObjectFileRevision file_revision;
+    CipUdint file_size;
+    CipUint file_checksum;
+    CipUsint invocation_method;
+    CipByte file_save_parameters;
+    CipUsint file_access_rule;
+    CipUsint file_encoding_format;
+    CipUsint file_transfer_timeout;
+    /* Non CIP values */
+    FILE *file_handle; /* TODO: Make platform independent */
+    CipFileObjectUploadSession *aquired_session;
 } CipFileObjectValues;
 
 EipStatus CipFileInit(void);
+
+void CipFileSessionTimerCheck(const MilliSeconds elapsed_time);
 
 #endif /* OPENER_CIPFILE_H_ */
