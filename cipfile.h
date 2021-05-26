@@ -36,17 +36,17 @@ typedef enum cip_file_object_file_access_rule {
 } CipFileObjectFileAccessRule;
 
 typedef enum cip_file_object_file_encoding_format {
-  kCipFileObjectFileEncodinfFormatBinary = 0,
-  kCipFileObjectFileEncodinfFormatCompressedFile = 1, /*<< ZLIB compression */
-  kCipFileObjectFileEncodinfFormatPEMEncodedCertificate = 2,
-  kCipFileObjectFileEncodinfFormatPKCS7EncodedCertificate = 3,
-  kCipFileObjectFileEncodinfFormatPEMEncodedCRL = 4,
-  kCipFileObjectFileEncodinfFormatPKS7EncodedCRL = 5,
-  kCipFileObjectFileEncodinfFormatASCIIText = 11,
-  kCipFileObjectFileEncodinfFormatWord = 12, /*<< doc, docx */
-  kCipFileObjectFileEncodinfFormatExcel = 13, /*<< xls, xlsx */
-  kCipFileObjectFileEncodinfFormatPDF = 14, /*<< pdf */
-  kCipFileObjectFileEncodinfFormatUnkown = 255
+  kCipFileObjectFileEncodingFormatBinary = 0,
+  kCipFileObjectFileEncodingFormatCompressedFile = 1, /*<< ZLIB compression */
+  kCipFileObjectFileEncodingFormatPEMEncodedCertificate = 2,
+  kCipFileObjectFileEncodingFormatPKCS7EncodedCertificate = 3,
+  kCipFileObjectFileEncodingFormatPEMEncodedCRL = 4,
+  kCipFileObjectFileEncodingFormatPKS7EncodedCRL = 5,
+  kCipFileObjectFileEncodingFormatASCIIText = 11,
+  kCipFileObjectFileEncodingFormatWord = 12, /*<< doc, docx */
+  kCipFileObjectFileEncodingFormatExcel = 13, /*<< xls, xlsx */
+  kCipFileObjectFileEncodingFormatPDF = 14, /*<< pdf */
+  kCipFileObjectFileEncodingFormatUnkown = 255
 } CipFileObjectFileEncodingFormat;
 
 typedef enum cip_file_transfer_packet_type {
