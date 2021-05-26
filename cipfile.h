@@ -15,6 +15,9 @@ static const CipUint kCipFileObjectClassCode = 0x37U;
 
 static const CipUint kCipFileObjectInitiateUploadServiceCode = 0x4BU;
 static const CipUint kCipFileObjectUploadTransferServiceCode = 0x4FU;
+static const CipUint kCipFileObjectInitiateDownloadServiceCode = 0x4CU;
+static const CipUint kCipFileObjectDownloadTransferServiceCode = 0x50U;
+static const CipUint kCipFileObjectClearFileServiceCode = 0x51U;
 
 typedef struct cip_file_object_file_revision {
     CipUsint major_revision;
@@ -75,6 +78,11 @@ typedef struct cip_file_object_values {
     /* Non CIP values */
     FILE *file_handle; /* TODO: Make platform independent */
     CipFileObjectUploadSession *aquired_session;
+
+    /* Function pointers if an object supports Download/Clear or not! */
+    CipServiceFunction initiate_download;
+    CipServiceFunction download_transfer;
+    CipServiceFunction clear_file;
 } CipFileObjectValues;
 
 EipStatus CipFileInit(void);
