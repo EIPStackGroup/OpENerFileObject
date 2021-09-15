@@ -13,6 +13,10 @@
 
 static const CipUint kCipFileObjectClassCode = 0x37U;
 
+#define CIP_FILE_OBJECT_MAXIMUM_TRANSFER_SIZE 100U
+#define CIP_FILE_MAX_SIZE_IN_KB 10U
+#define CIP_FILE_MAX_TRANSFERABLE_SIZE (1024U * CIP_FILE_MAX_SIZE_IN_KB) /* 1024 = 1kByte, times CIP_FILE_MAX_SIZE_IN_KB */
+
 static const CipUint kCipFileObjectInitiateUploadServiceCode = 0x4BU;
 static const CipUint kCipFileObjectUploadTransferServiceCode = 0x4FU;
 static const CipUint kCipFileObjectInitiateDownloadServiceCode = 0x4CU;
@@ -83,6 +87,7 @@ typedef struct cip_file_object_values {
     CipServiceFunction initiate_download;
     CipServiceFunction download_transfer;
     CipServiceFunction clear_file;
+    CipOctet data[CIP_FILE_MAX_TRANSFERABLE_SIZE];
 } CipFileObjectValues;
 
 EipStatus CipFileInit(void);

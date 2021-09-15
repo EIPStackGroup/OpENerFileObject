@@ -15,6 +15,7 @@
 #include "opener_api.h"
 #include "trace.h"
 #include "cipstring.h"
+#include "cipstringi.h"
 
 #define STATIC_FILE_OBJECT_NUMBER_OF_INSTANCES 2
 #define CIP_FILE_OBJECT_DEFAULT_TIMEOUT 10U
@@ -28,9 +29,6 @@ static CipFileObjectValues *eds_file_instance = &file_object_values[0]; /* EDS f
 static CipBool dummy_attribute;
 
 static const CipUint kCipFileEDSAndIconFileInstanceNumber = 0xC8U;
-
-#define CIP_FILE_OBJECT_MAXIMUM_TRANSFER_SIZE 100U
-#define CIP_FILE_MAX_TRANSFERABLE_SIZE (1024U * 10U)
 
 typedef struct cip_file_upload_session {
   bool inUse;
@@ -52,7 +50,9 @@ typedef struct cip_file_download_session {
   CipRevision file_revision;
   CipStringI file_name;
   CipOctet data[CIP_FILE_MAX_TRANSFERABLE_SIZE];
+  CipOctet *current_data_position;
   CipUsint negotiated_transfer_size;
+  CipUsint transfer_number;
 } CipFileDownloadSession;
 
 #define CIP_FILE_MAX_FILE_TRANSFER_SESSIONS 1
@@ -84,7 +84,7 @@ typedef enum cip_file_transfer_general_status_code {
   kCipFileTransferGeneralStatusFailOnTransferZeroSize = 0x20U,
   kCipFileTransferGeneralStatusFailOnTransferDuplicate = 0x20U,
   kCipFileTransferGeneralStatusTransferAlreadyInitiatedOrInProgress = 0x0CU, /**< additional status state attribute */
-  kCipFileTransferGeneralStatusFailOnChecksum = 0xD0U, /**< Dummy code indicating no additional code required */
+  kCipFileTransferGeneralStatusFailOnChecksum = 0xD0U, /**< Fail on checksum */
   kCipFileTransferGeneralStatusFailOnSaveToNonVolatileMemory = 0x0019U /**< Dummy code indicating no additional code required */
 } CipFileTransferGeneralStatusCode;
 
@@ -359,7 +359,7 @@ static CipFileObjectState TransferUpload(CipInstance *RESTRICT const instance, C
 
   if(kCipFileTransferPacketTypeLastTransferPacket == transfer_packet_type) {
     OPENER_TRACE_INFO("Last transfer packet\n");
-    EncodeCipInt(&struct_to_instance->file_checksum, &message_router_response->message);
+    EncodeCipUint(&struct_to_instance->file_checksum, &message_router_response->message);
     rewind(struct_to_instance->file_handle);
     CipFileReleaseUploadSession(struct_to_instance);
     return kCipFileObjectStateFileLoaded;
@@ -402,7 +402,7 @@ EipStatus CipFileInitiateUpload(CipInstance *RESTRICT const instance, CipMessage
       GenerateResponseHeader(kCipErrorObjectStateConflict, 1, *state, message_router_request, message_router_response);
       break;
     default:
-      OPENER_TRACE_ERR("Unknown state in File Object instance: %d", instance->instance_number);
+      OPENER_TRACE_ERR("Unknown state %d in File Object instance: %d", *state, instance->instance_number);
       OPENER_ASSERT(false);
       break;
   }
@@ -443,38 +443,11 @@ EipStatus CipFileUploadTransfer(CipInstance *RESTRICT const instance, CipMessage
       *state = TransferUpload(instance, message_router_request, message_router_response);
       break;
     default:
-      OPENER_TRACE_ERR("Unknown state in File Object instance: %d", instance->instance_number);
+      OPENER_TRACE_ERR("Unknown state %d in File Object instance: %d", *state, instance->instance_number);
       OPENER_ASSERT(false);
       break;
   }
   return kEipStatusOkSend;
-}
-
-bool CipStringIsAnyStringEmpty(const CipStringI *const string) {
-  for(size_t i = 0; i < string->number_of_strings; ++i) {
-    size_t length = 0;
-    void *pointer_to_string = &string->array_of_string_i_structs[i].string;
-    switch(string->array_of_string_i_structs[i].char_string_struct){
-      case kCipShortString:
-        length = ((CipShortString*) pointer_to_string)->length;
-        break;
-      case kCipString:
-        length = ((CipString*) pointer_to_string)->length;
-        break;
-      case kCipString2:
-        length = ((CipString2*) pointer_to_string)->length;
-        break;
-      case kCipStringN:
-        length = ((CipStringN*) pointer_to_string)->length;
-        break;
-      default:
-        OPENER_TRACE_ERR("CIP File: No valid String type received!\n");
-    }
-    if(0 == length) {
-      return true;
-    }
-  }
-  return false;
 }
 
 static CipFileObjectState InitiateDownload(CipInstance *RESTRICT const instance, CipMessageRouterRequest *const message_router_request,
@@ -496,7 +469,7 @@ static CipFileObjectState InitiateDownload(CipInstance *RESTRICT const instance,
     switch(download_sessions[0].file_name.array_of_string_i_structs[i].char_string_struct){
       case kCipShortString: {
         download_sessions[0].file_name.array_of_string_i_structs[i].string = CipCalloc(1, sizeof(CipShortString));
-        CipShortString *const short_string = (CipShortString* const ) &download_sessions[0].file_name.array_of_string_i_structs[i].string;
+        CipShortString *const short_string = (CipShortString* const ) download_sessions[0].file_name.array_of_string_i_structs[i].string;
         CipUsint length = GetUsintFromMessage(&message_router_request->data);
         SetCipShortStringByData(short_string, length, message_router_request->data);
         message_router_request->data += length;
@@ -504,7 +477,7 @@ static CipFileObjectState InitiateDownload(CipInstance *RESTRICT const instance,
         break;
       case kCipString: {
         download_sessions[0].file_name.array_of_string_i_structs[i].string = CipCalloc(1, sizeof(CipString));
-        CipString *const string = (CipString* const ) &download_sessions[0].file_name.array_of_string_i_structs[i].string;
+        CipString *const string = (CipString* const ) download_sessions[0].file_name.array_of_string_i_structs[i].string;
         CipUint length = GetUintFromMessage(&message_router_request->data);
         SetCipStringByData(string, length, message_router_request->data);
         message_router_request->data += length;
@@ -512,7 +485,7 @@ static CipFileObjectState InitiateDownload(CipInstance *RESTRICT const instance,
         break;
       case kCipString2: {
         download_sessions[0].file_name.array_of_string_i_structs[i].string = CipCalloc(1, sizeof(CipString2));
-        CipString2 *const string = (CipString2* const ) &download_sessions[0].file_name.array_of_string_i_structs[i].string;
+        CipString2 *const string = (CipString2* const ) download_sessions[0].file_name.array_of_string_i_structs[i].string;
         CipUint length = GetUintFromMessage(&message_router_request->data);
         SetCipString2ByData(string, length, message_router_request->data);
         message_router_request->data += length * 2 * sizeof(CipOctet);
@@ -523,7 +496,7 @@ static CipFileObjectState InitiateDownload(CipInstance *RESTRICT const instance,
         CipUint length = GetUintFromMessage(&message_router_request->data);
 
         download_sessions[0].file_name.array_of_string_i_structs[i].string = CipCalloc(1, sizeof(CipStringN));
-        CipStringN *const string = (CipStringN* const ) &download_sessions[0].file_name.array_of_string_i_structs[i].string;
+        CipStringN *const string = (CipStringN* const ) download_sessions[0].file_name.array_of_string_i_structs[i].string;
         SetCipStringNByData(string, length, size, message_router_request->data);
         message_router_request->data += length * size;
       }
@@ -569,41 +542,14 @@ static CipFileObjectState InitiateDownload(CipInstance *RESTRICT const instance,
   return kCipFileObjectStateTransferDownloadInitiated;
 }
 
-void CipStringIDelete(CipStringI *const string) {
-  for(size_t i = 0; i < string->number_of_strings; ++i) {
-    string->array_of_string_i_structs[i].language_char_1 = '\0';
-    string->array_of_string_i_structs[i].language_char_2 = '\0';
-    string->array_of_string_i_structs[i].language_char_3 = '\0';
-    string->array_of_string_i_structs[i].character_set = '\0';
-    switch(string->array_of_string_i_structs[i].char_string_struct){
-      case kCipShortString:
-        ClearCipShortString((CipShortString*) &string->array_of_string_i_structs[i].string);
-        break;
-      case kCipString:
-        ClearCipString((CipString*) &string->array_of_string_i_structs[i].string);
-        break;
-      case kCipString2:
-        ClearCipString2((CipString2*) &string->array_of_string_i_structs[i].string);
-        break;
-      case kCipStringN:
-        ClearCipStringN((CipStringN*) &string->array_of_string_i_structs[i].string);
-        break;
-      default:
-        OPENER_TRACE_ERR("CIP File: No valid String type received!\n");
-    }
-    string->array_of_string_i_structs[i].char_string_struct = 0x00;
-  }
-  string->number_of_strings = 0;
-  CipFree(string->array_of_string_i_structs);
-  string->array_of_string_i_structs = NULL;
-}
-
-EipStatus CipFileResetTransferSession(CipFileDownloadSession *const session) {
+EipStatus CipFileResetDownloadTransferSession(CipFileDownloadSession *const session) {
   session->file_format_version = 0;
   session->file_revision.major_revision = 0;
   session->file_revision.minor_revision = 0;
   session->file_size = 0;
   CipStringIDelete(&session->file_name);
+  session->current_data_position = session->data;
+  session->transfer_number = 0;
   memset(session->data, 0, CIP_FILE_MAX_TRANSFERABLE_SIZE);
   return kEipStatusOk;
 }
@@ -616,7 +562,7 @@ static CipFileObjectState TransferDownloadFromInitiateDownload(CipInstance *REST
   CipUsint transfer_packet_type = GetUsintFromMessage(&message_router_request->data);
 
   if(kCipFileTransferPacketTypeAbortTransfer == transfer_packet_type) {
-    CipFileResetTransferSession(&download_sessions[0]);
+    CipFileResetDownloadTransferSession(&download_sessions[0]);
     message_router_response->general_status = kCipErrorSuccess;
     EncodeCipUsint(&transfer_number, &message_router_response->message);
     return kCipFileObjectStateFileEmpty;
@@ -624,6 +570,7 @@ static CipFileObjectState TransferDownloadFromInitiateDownload(CipInstance *REST
 
   /* If middle or last packet type, return error, as this is not possible here */
   if(kCipFileTransferPacketTypeMiddleTransferPacket == transfer_packet_type || kCipFileTransferPacketTypeLastTransferPacket == transfer_packet_type) {
+    OPENER_TRACE_ERR("CIP File: On switch from InitiateDownload to Download Transfer, first packet expected but not received\n");
     message_router_response->general_status = kCipErrorObjectStateConflict;
     message_router_response->size_of_additional_status = 1;
     CipAttributeStruct *state_attribute = GetCipAttribute(instance, 1);
@@ -634,6 +581,7 @@ static CipFileObjectState TransferDownloadFromInitiateDownload(CipInstance *REST
 
   /* If the transfer number is not zero, return error. This has to be the first packet */
   if(0 != transfer_number) {
+    OPENER_TRACE_ERR("CIP File: On switch from InitiateDownload to Download Transfer, transfer number 0 expected, but not received\n");
     message_router_response->general_status = kCipErrorInvalidParameter;
     message_router_response->additional_status[0] = kCipFileTransferExtendedStatusFailOnTransferOutOfSequence;
     message_router_response->size_of_additional_status = 1;
@@ -641,8 +589,10 @@ static CipFileObjectState TransferDownloadFromInitiateDownload(CipInstance *REST
   }
 
   /* Calculate payload length */
-  size_t payload_length = message_router_request->request_path_size - sizeof(CipUsint) - sizeof(CipUsint);
+  size_t payload_length = message_router_request->request_data_size - sizeof(CipUsint) - sizeof(CipUsint)
+    - (kCipFileTransferPacketTypeFirstAndLastPacket == transfer_packet_type ? sizeof(CipUint) : 0);
   if(CIP_FILE_OBJECT_MAXIMUM_TRANSFER_SIZE < payload_length) { /* payload has to be smaller than maximum transfer size */
+    OPENER_TRACE_ERR("CIP File: Payload greater than maximum transfer size\n");
     message_router_response->general_status = kCipErrorInvalidParameter;
     message_router_response->additional_status[0] = kCipFileInitiateExtendedStatusFileSizeTooLarge;
     message_router_response->size_of_additional_status = 1;
@@ -651,27 +601,134 @@ static CipFileObjectState TransferDownloadFromInitiateDownload(CipInstance *REST
   }
 
   if(kCipFileTransferPacketTypeFirstAndLastPacket == transfer_packet_type) {
-    size_t data_payload_length = payload_length - sizeof(CipUint); /* Last 16-bits are checksum */
-    const CipUint calculated_checksum = CipFileCalculateChecksumFromArray(data_payload_length, message_router_request->data);
-    const CipUint received_checksum = *(message_router_request->data + data_payload_length);
+    //size_t data_payload_length = payload_length - sizeof(CipUint); /* Last 16-bits are checksum */
+    const CipUint calculated_checksum = CipFileCalculateChecksumFromArray(payload_length, message_router_request->data);
+    const CipUint received_checksum = *(CipUint*) (message_router_request->data + payload_length);
+    EncodeCipUsint(&transfer_number, &message_router_response->message);
 
     if(calculated_checksum != received_checksum) {
       message_router_response->general_status = kCipFileTransferGeneralStatusFailOnChecksum;
-      CipFileResetTransferSession(&download_sessions[0]);
+      CipFileResetDownloadTransferSession(&download_sessions[0]);
       return kCipFileObjectStateFileEmpty;
     }
-    memcpy(download_sessions[0].data, message_router_request->data, data_payload_length);
+    memcpy(download_sessions[0].data, message_router_request->data, payload_length);
     return kCipFileObjectStateStoring;
   }
 
-  if(kCipFileTransferPacketTypeFirstTransferPacket == transfer_packet_type || kCipFileTransferPacketTypeFirstAndLastPacket == transfer_packet_type) {
+  if(kCipFileTransferPacketTypeFirstTransferPacket == transfer_packet_type) {
     size_t data_payload_length = payload_length; /* No checksum */
-    memcpy(download_sessions[0].data, message_router_request->data, data_payload_length);
+    memcpy(download_sessions[0].current_data_position, message_router_request->data, data_payload_length);
+    download_sessions[0].current_data_position += data_payload_length;
     EncodeCipUsint(&transfer_number, &message_router_response->message);
     return kCipFileObjectStateTransferDownloadInProgress;
   }
 
   return kCipFileObjectStateTransferDownloadInitiated;
+}
+
+static CipFileObjectState TransferDownload(CipInstance *RESTRICT const instance, CipMessageRouterRequest *const message_router_request,
+    CipMessageRouterResponse *const message_router_response) {
+
+  /* Get transfer number and packet type*/
+  CipUsint transfer_number = GetUsintFromMessage(&message_router_request->data);
+  CipUsint transfer_packet_type = GetUsintFromMessage(&message_router_request->data);
+
+  if(kCipFileTransferPacketTypeAbortTransfer == transfer_packet_type) {
+    CipFileResetDownloadTransferSession(&download_sessions[0]);
+    message_router_response->general_status = kCipErrorSuccess;
+    EncodeCipUsint(&transfer_number, &message_router_response->message);
+    return kCipFileObjectStateFileEmpty;
+  }
+
+  /* First Packet has already been processed in TransferDownloadFromInitiateDownload */
+  if(kCipFileTransferPacketTypeFirstTransferPacket == transfer_packet_type || kCipFileTransferPacketTypeFirstAndLastPacket == transfer_packet_type) {
+    message_router_response->general_status = kCipErrorObjectStateConflict;
+    message_router_response->size_of_additional_status = 1;
+    CipAttributeStruct *state_attribute = GetCipAttribute(instance, 1);
+    CipUsint *state = (CipUsint*) state_attribute->data;
+    message_router_response->additional_status[0] = *state;
+    return kCipFileObjectStateTransferDownloadInProgress;
+  }
+
+  /* If the transfer number is not zero, return error. This has to be the first packet */
+  if(download_sessions[0].transfer_number + 1 != transfer_number) {
+    message_router_response->general_status = kCipErrorInvalidParameter;
+    message_router_response->size_of_additional_status = 1;
+    if(download_sessions[0].transfer_number == transfer_number) {
+      message_router_response->additional_status[0] = kCipFileTransferExtendedStatusFailOnTransferDuplicate;
+    } else {
+      message_router_response->additional_status[0] = kCipFileTransferExtendedStatusFailOnTransferOutOfSequence;
+    }
+    return kCipFileObjectStateTransferDownloadInProgress;
+  }
+
+  /* transfer number ok */
+  download_sessions[0].transfer_number = transfer_number;
+
+  /* Calculate payload length */
+  size_t payload_length = message_router_request->request_data_size - sizeof(CipUsint) - sizeof(CipUsint);
+  if(CIP_FILE_OBJECT_MAXIMUM_TRANSFER_SIZE < payload_length) { /* payload has to be smaller than maximum transfer size */
+    message_router_response->general_status = kCipErrorInvalidParameter;
+    message_router_response->additional_status[0] = kCipFileInitiateExtendedStatusFileSizeTooLarge;
+    message_router_response->size_of_additional_status = 1;
+    EncodeCipUsint(&transfer_number, &message_router_response->message);
+    return kCipFileObjectStateFileEmpty;
+  }
+
+  if(kCipFileTransferPacketTypeMiddleTransferPacket == transfer_packet_type) {
+    size_t data_payload_length = payload_length; /* No checksum */
+    memcpy(download_sessions[0].current_data_position, message_router_request->data, data_payload_length);
+    download_sessions[0].current_data_position += data_payload_length;
+    EncodeCipUsint(&transfer_number, &message_router_response->message);
+    return kCipFileObjectStateTransferDownloadInProgress;
+  }
+
+  if(kCipFileTransferPacketTypeLastTransferPacket == transfer_packet_type) {
+    size_t data_payload_length = payload_length - sizeof(CipUint); /* Last 16-bits are checksum */
+    /* Get last bits of data */
+    memcpy(download_sessions[0].current_data_position, message_router_request->data, data_payload_length);
+    download_sessions[0].current_data_position += data_payload_length;
+    EncodeCipUsint(&transfer_number, &message_router_response->message);
+
+    /* Calculate checksum */
+    const CipUint calculated_checksum = CipFileCalculateChecksumFromArray(download_sessions[0].current_data_position - download_sessions[0].data,
+      download_sessions[0].data);
+    const CipUint received_checksum = *(CipUint*) (message_router_request->data + data_payload_length);
+
+    OPENER_TRACE_INFO("Download Transfer calculated checksum: %x - received checksum: %x\n", calculated_checksum, received_checksum);
+
+    if(calculated_checksum != received_checksum) {
+      message_router_response->general_status = kCipFileTransferGeneralStatusFailOnChecksum;
+      CipFileResetDownloadTransferSession(&download_sessions[0]);
+      return kCipFileObjectStateFileEmpty;
+    }
+    /* Currently no save to non-volatile storage */
+    return kCipFileObjectStateStoring;
+  }
+  return kCipFileObjectStateTransferDownloadInProgress; //TODO: What to do if nothing matches? Check this again
+}
+
+static CipFileObjectState CipFileStore(CipInstance *RESTRICT const instance) {
+
+  OPENER_TRACE_INFO("CIP File: Storing instance %d\n", instance->instance_number);
+  CipFileObjectValues *struct_to_instance;
+  if(NULL == (struct_to_instance = CipFileObjectGetDataStruct(instance))) {
+    /*No entry found - not possible as instance was found */
+    OPENER_ASSERT(false);
+  }
+
+  /* copy data to file object instance*/
+  struct_to_instance->file_size = download_sessions[0].file_size;
+  memcpy(struct_to_instance->data, download_sessions[0].data, struct_to_instance->file_size);
+  struct_to_instance->file_format_version = download_sessions[0].file_format_version;
+  struct_to_instance->file_revision.major_revision = download_sessions[0].file_revision.major_revision;
+  struct_to_instance->file_revision.minor_revision = download_sessions[0].file_revision.minor_revision;
+  struct_to_instance->file_checksum = CipFileCalculateChecksumFromArray(struct_to_instance->file_size, struct_to_instance->data);
+
+  CipStringIDelete(&struct_to_instance->file_name);
+  CipStringICopy(&struct_to_instance->file_name, &download_sessions[0].file_name);
+
+  return kCipFileObjectStateFileLoaded;
 }
 
 EipStatus CipFileInitiateDownload(CipInstance *RESTRICT const instance, CipMessageRouterRequest *const message_router_request,
@@ -716,7 +773,7 @@ EipStatus CipFileInitiateDownloadImplementation(CipInstance *RESTRICT const inst
     case kCipFileObjectStateFileLoaded:
       /* Insert Happy Path */
       GenerateResponseHeader(kCipErrorSuccess, 1, *state, message_router_request, message_router_response);
-      CipFileResetTransferSession(&download_sessions[0]);
+      CipFileResetDownloadTransferSession(&download_sessions[0]);
       //*state = ClearFileDataAndAttrributes();
       *state = InitiateDownload(instance, message_router_request, message_router_response);
       break;
@@ -727,7 +784,7 @@ EipStatus CipFileInitiateDownloadImplementation(CipInstance *RESTRICT const inst
       GenerateResponseHeader(kCipErrorObjectStateConflict, 1, *state, message_router_request, message_router_response);
       break;
     default:
-      OPENER_TRACE_ERR("Unknown state in File Object instance: %d", instance->instance_number);
+      OPENER_TRACE_ERR("Unknown state %d in File Object instance: %d", *state, instance->instance_number);
       OPENER_ASSERT(false);
       break;
   }
@@ -746,9 +803,12 @@ EipStatus CipFileDownloadTransfer(CipInstance *RESTRICT const instance, CipMessa
 
 EipStatus CipFileDownloadTransferImplementation(CipInstance *RESTRICT const instance, CipMessageRouterRequest *const message_router_request,
     CipMessageRouterResponse *const message_router_response, const struct sockaddr *originator_address, const int encapsulation_session) {
-  CipAttributeStruct *file_access_attribute = GetCipAttribute(instance, 10);
-  CipAttributeStruct *state_attribute = GetCipAttribute(instance, 1);
-  CipUsint *state = (CipUsint*) state_attribute->data;
+  CipAttributeStruct *const state_attribute = GetCipAttribute(instance, 1);
+  CipUsint *const state = (CipUsint*) state_attribute->data;
+
+  CipAttributeStruct *const file_save_parameters_struct = GetCipAttribute(instance, 9);
+  const CipByte file_save_parameters = *(CipByte*) file_save_parameters_struct->data; /* shall not be modified */
+  CipAttributeStruct *const file_access_attribute = GetCipAttribute(instance, 10);
   if(kCipFileObjectFileAccessRuleReadOnly == *(CipUsint*) file_access_attribute->data) {
     GenerateResponseHeader(kCipErrorObjectStateConflict, 1, *state, message_router_request, message_router_response);
     return kEipStatusOkSend;
@@ -766,6 +826,7 @@ EipStatus CipFileDownloadTransferImplementation(CipInstance *RESTRICT const inst
       break;
     case kCipFileObjectStateTransferDownloadInProgress:
       GenerateResponseHeader(kCipErrorSuccess, 0, 0, message_router_request, message_router_response);
+      *state = TransferDownload(instance, message_router_request, message_router_response);
       break;
     case kCipFileObjectStateStoring:
       GenerateResponseHeader(kCipErrorObjectStateConflict, 1, *state, message_router_request, message_router_response);
@@ -780,10 +841,16 @@ EipStatus CipFileDownloadTransferImplementation(CipInstance *RESTRICT const inst
       GenerateResponseHeader(kCipErrorSuccess, 0, 0, message_router_request, message_router_response);
       break;
     default:
-      OPENER_TRACE_ERR("Unknown state in File Object instance: %d", instance->instance_number);
+      OPENER_TRACE_ERR("Unknown state %d in File Object instance: %d", *state, instance->instance_number);
       OPENER_ASSERT(false);
       break;
   }
+
+  OPENER_TRACE_INFO("CIP File: Instance %d in DownloadTransfer - State: %d\n", instance->instance_number, *state);
+  if(kCipFileObjectStateStoring == *state && ((file_save_parameters & 0x0F) == 0)) { /* e.g. download is finished, then the data has to be saved (autosave) */
+    *state = CipFileStore(instance);
+  }
+
   return kEipStatusOkSend;
 }
 
@@ -823,7 +890,7 @@ EipStatus CipFileClearFileImplementation(CipInstance *RESTRICT const instance, C
       break;
     case kCipFileObjectStateTransferDownloadInitiated:
       GenerateResponseHeader(kCipErrorSuccess, 0, 0, message_router_request, message_router_response);
-      CipFileResetTransferSession(&download_sessions[0]);
+      CipFileResetDownloadTransferSession(&download_sessions[0]);
       *state = kCipFileObjectStateFileEmpty;
       break;
     case kCipFileObjectStateTransferDownloadInProgress:
@@ -849,7 +916,7 @@ EipStatus CipFileClearFileImplementation(CipInstance *RESTRICT const instance, C
       /*clear all data and transition to Empty File*/
       break;
     default:
-      OPENER_TRACE_ERR("Unknown state in File Object instance: %d", instance->instance_number);
+      OPENER_TRACE_ERR("Unknown state %d in File Object instance: %d", *state, instance->instance_number);
       OPENER_ASSERT(false);
       break;
   }
@@ -1043,6 +1110,7 @@ EipStatus CipFileInit() {
   const char instance_1_name[] = "File Instance 1";
 
   CipFileSetInstanceName(&file_object_values[1], instance_1_name, sizeof(instance_1_name));
+  CipStringIDelete(&file_object_values[1].file_name);
 
   return CipFileCreateEDSAndIconFileInstance(); /* No instance number needed as this is fixed in the ENIP Spec */
 }
