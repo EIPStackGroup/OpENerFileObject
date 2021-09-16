@@ -872,6 +872,30 @@ EipStatus CipFileServiceNotSupportedForSpecifiedPath(CipInstance *RESTRICT const
   return kEipStatusOkSend;
 }
 
+CipFileObjectState CipFileObjectDeleteFileData(CipInstance *const instance) {
+  CipFileObjectValues *struct_to_instance;
+  if(NULL == (struct_to_instance = CipFileObjectGetDataStruct(instance))) {
+    /*No entry found - not possible as instance was found */
+    OPENER_ASSERT(false);
+  }
+  CipStringIDelete(&struct_to_instance->file_name);
+
+  struct_to_instance->state = kCipFileObjectStateFileEmpty;
+  struct_to_instance->file_size = 0;
+  struct_to_instance->file_checksum = 0;
+  struct_to_instance->file_revision.major_revision = 0;
+  struct_to_instance->file_revision.minor_revision = 0;
+
+  struct_to_instance->file_format_version = 0;
+  struct_to_instance->invocation_method = kCipFileInvocationMethodNotApplicable;
+  struct_to_instance->file_save_parameters = 0;
+  struct_to_instance->file_access_rule = kCipFileObjectFileAccessRuleReadWrite;
+  struct_to_instance->file_encoding_format = kCipFileObjectFileEncodingFormatBinary;
+  memset(struct_to_instance->data, 0, CIP_FILE_MAX_TRANSFERABLE_SIZE);
+
+  return kCipFileObjectStateFileEmpty;
+}
+
 EipStatus CipFileClearFileImplementation(CipInstance *RESTRICT const instance, CipMessageRouterRequest *const message_router_request,
     CipMessageRouterResponse *const message_router_response, const struct sockaddr *originator_address, const int encapsulation_session) {
   CipAttributeStruct *file_access_attribute = GetCipAttribute(instance, 10);
@@ -889,30 +913,29 @@ EipStatus CipFileClearFileImplementation(CipInstance *RESTRICT const instance, C
       GenerateResponseHeader(kCipErrorSuccess, 0, 0, message_router_request, message_router_response);
       break;
     case kCipFileObjectStateTransferDownloadInitiated:
-      GenerateResponseHeader(kCipErrorSuccess, 0, 0, message_router_request, message_router_response);
-      CipFileResetDownloadTransferSession(&download_sessions[0]);
-      *state = kCipFileObjectStateFileEmpty;
+      GenerateResponseHeader(kCipErrorObjectStateConflict, 0, 0, message_router_request, message_router_response);
       break;
     case kCipFileObjectStateTransferDownloadInProgress:
-      GenerateResponseHeader(kCipErrorSuccess, 0, 0, message_router_request, message_router_response);
-      /*clear all data and transition to Empty File*/
+      GenerateResponseHeader(kCipErrorObjectStateConflict, 0, 0, message_router_request, message_router_response);
       break;
     case kCipFileObjectStateStoring:
       GenerateResponseHeader(kCipErrorSuccess, 0, 0, message_router_request, message_router_response);
-      /*clear all data and transition to Empty File*/
+      /*clear all data and transition to Empty File <- Not necessary right now, as we do not expose the Storing service*/
+      *state = kCipFileObjectStateFileEmpty;
       break;
     case kCipFileObjectStateFileLoaded:
       GenerateResponseHeader(kCipErrorSuccess, 0, 0, message_router_request, message_router_response);
       /*clear all data and transition to Empty File*/
+      *state = CipFileObjectDeleteFileData(instance);
       break;
     case kCipFileObjectStateTransferUploadInitiated:
       /* Insert Happy Path */
-      GenerateResponseHeader(kCipErrorSuccess, 0, 0, message_router_request, message_router_response);
+      GenerateResponseHeader(kCipErrorObjectStateConflict, 0, 0, message_router_request, message_router_response);
       /*clear all data and transition to Empty File*/
       break;
     case kCipFileObjectStateTransferUploadInProgress:
       /* Insert Happy Path */
-      GenerateResponseHeader(kCipErrorSuccess, 0, 0, message_router_request, message_router_response);
+      GenerateResponseHeader(kCipErrorObjectStateConflict, 0, 0, message_router_request, message_router_response);
       /*clear all data and transition to Empty File*/
       break;
     default:
