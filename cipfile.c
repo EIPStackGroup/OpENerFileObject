@@ -20,13 +20,13 @@
 
 static CipClass *file_object_class = NULL;
 
-static CipFileObjectValues file_object_values[STATIC_FILE_OBJECT_NUMBER_OF_INSTANCES];
+static CipFileObjectValues file_object_values[STATIC_FILE_OBJECT_NUMBER_OF_INSTANCES]; //TODO: change ??
 
 static CipFileObjectValues *eds_file_instance = &file_object_values[0]; /* EDS file instance*/
 
 static CipBool dummy_attribute;
 
-static const CipUint kCipFileEDSAndIconFileInstanceNumber = 0xC8U;
+static const CipUint kCipFileEDSAndIconFileInstanceNumber = 0xC8U; //200
 
 #define CIP_FILE_OBJECT_MAXIMUM_TRANSFER_SIZE 100U
 #define CIP_FILE_UPLOAD_SESSIONS 1
@@ -409,6 +409,72 @@ EipStatus CipFileUploadTransfer(CipInstance *RESTRICT const instance, CipMessage
   return kEipStatusOkSend;
 }
 
+/** @brief File Object PreCreateCallback
+ *
+ *  Used for common Create service before new instance is created
+ *  @See Vol.1, Chapter 5A-42.4.1
+ */
+EipStatus CipFilePreCreateCallback(
+    CipInstance *RESTRICT const instance,
+    CipMessageRouterRequest *const message_router_request,
+    CipMessageRouterResponse *const message_router_response
+) {
+
+  if (message_router_request->request_data_size > 0) {
+    return kEipStatusOk;
+  } else {
+    message_router_response->general_status = kCipErrorNotEnoughData;
+    return kEipStatusError;
+  }
+}
+
+/** @brief File Object PostCreateCallback
+ *
+ *  Used for common Create service after new instance is created
+ *  @See Vol.1, Chapter 5A-42.4.1
+ */
+EipStatus CipFilePostCreateCallback(
+    CipInstance *RESTRICT const new_instance,
+    CipMessageRouterRequest *const message_router_request,
+    CipMessageRouterResponse *const message_router_response
+) {
+
+	//TODO: check if instance_name is already in use
+
+	//TODO: get Encoding param from request - default 0
+
+	CipFileObjectValues *file_instance = CipCalloc(1, sizeof(CipFileObjectValues));
+	file_instance->instance_name.number_of_strings = GetUsintFromMessage(&message_router_request->data);
+
+	file_instance->instance_name.array_of_string_i_structs = CipCalloc(file_instance->instance_name.number_of_strings, sizeof(CipStringIStruct));
+	file_instance->instance_name.array_of_string_i_structs[0].language_char_1 = GetUsintFromMessage(&message_router_request->data);//'e'
+	file_instance->instance_name.array_of_string_i_structs[0].language_char_2 = GetUsintFromMessage(&message_router_request->data);//'n'
+	file_instance->instance_name.array_of_string_i_structs[0].language_char_3 = GetUsintFromMessage(&message_router_request->data);//'g'
+	file_instance->instance_name.array_of_string_i_structs[0].char_string_struct = GetUsintFromMessage(&message_router_request->data);//TODO: check: if DA - ShortString, ...
+	file_instance->instance_name.array_of_string_i_structs[0].character_set = GetUintFromMessage(&message_router_request->data);//kCipStringICharSet_ISO_8859_1_1987;
+	file_instance->instance_name.array_of_string_i_structs[0].string = CipCalloc(1, sizeof(CipShortString));
+
+	CipShortString *instance_name_string = (CipShortString*) (file_instance->instance_name.array_of_string_i_structs[0].string);
+	instance_name_string->length = GetUsintFromMessage(&message_router_request->data);
+	instance_name_string->string = (CipByte *)CipCalloc(instance_name_string->length, sizeof(CipByte));
+	memcpy(instance_name_string->string, message_router_request->data, instance_name_string->length);
+
+	file_instance->state = kCipFileObjectStateFileEmpty;
+	file_instance->file_revision.major_revision = 0;
+	file_instance->file_revision.minor_revision = 0;
+
+	file_instance->invocation_method = kCipFileInvocationMethodNotApplicable; //TODO: check
+
+	InsertAttribute(new_instance, 1, kCipUsint, EncodeCipUsint, NULL,  &file_instance->state, kGetableSingle);
+	InsertAttribute(new_instance, 2, kCipStringI, EncodeCipStringI, NULL, &file_instance->instance_name, kGetableSingle);
+	//TODO: check other attributes
+
+
+	AddIntToMessage(new_instance->instance_number, &(message_router_response->message));
+	AddSintToMessage(file_instance->invocation_method, &(message_router_response->message)); //TODO: add invocation_method to response
+	return kEipStatusOk;
+}
+
 EipStatus CreateFileObject(unsigned int instance_nr) {
   CipInstance *instance = GetCipInstance(file_object_class, instance_nr);
 
@@ -433,7 +499,7 @@ void CipFileInitializeClassSettings(CipClass *cip_class) {
   CipClass *meta_class = cip_class->class_instance.cip_class;
 
   InsertAttribute((CipInstance*) cip_class, 1, kCipUint, EncodeCipUint, NULL, (void*) &cip_class->revision, kGetableSingleAndAll); /* revision */
-  InsertAttribute((CipInstance*) cip_class, 2, kCipUint, EncodeCipUint, NULL, (void*) &cip_class->number_of_instances, kGetableSingleAndAll); /*  largest instance number */
+  InsertAttribute((CipInstance*) cip_class, 2, kCipUint, EncodeCipUint, NULL, (void*) &cip_class->max_instance, kGetableSingleAndAll); /*  largest instance number */
   InsertAttribute((CipInstance*) cip_class, 3, kCipUint, EncodeCipUint, NULL, (void*) &cip_class->number_of_instances, kGetableSingleAndAll); /* number of instances currently existing*/
   InsertAttribute((CipInstance*) cip_class, 4, kCipUint, EncodeCipUint, NULL, (void*) &kCipUintZero, kGetableAll); /* optional attribute list - default = 0 */
   InsertAttribute((CipInstance*) cip_class, 5, kCipUint, EncodeCipUint, NULL, (void*) &kCipUintZero, kNotSetOrGetable); /* optional service list - default = 0 */
@@ -442,8 +508,14 @@ void CipFileInitializeClassSettings(CipClass *cip_class) {
   InsertAttribute((CipInstance*) cip_class, 32, kCipAny, EncodeCipFileObjectDirectory, NULL, &dummy_attribute, kGetableSingle);
 
   InsertService(meta_class, kGetAttributeSingle, &GetAttributeSingle, "GetAttributeSingle");
+  InsertService(meta_class, kCreate, &CipCreateService, "Create");
 
-  cip_class->number_of_instances = kCipFileEDSAndIconFileInstanceNumber; /* Predefined instance for EDS File and Icon File */
+  // add Callback function pointers
+  cip_class->PreCreateCallback = &CipFilePreCreateCallback;
+  cip_class->PostCreateCallback = &CipFilePostCreateCallback;
+
+  cip_class->number_of_instances = 0;//kCipFileEDSAndIconFileInstanceNumber; /* Predefined instance for EDS File and Icon File */ //TODO: check
+  cip_class->max_instance = kCipFileEDSAndIconFileInstanceNumber; /* Predefined instance for EDS File and Icon File */
   AddCipInstance(cip_class, kCipFileEDSAndIconFileInstanceNumber);
 }
 
@@ -519,7 +591,7 @@ EipStatus CipFileCreateEDSAndIconFileInstance() {
 EipStatus CipFileInit() {
   if(NULL == (file_object_class = CreateCipClass(kCipFileObjectClassCode, 7, /* # class attributes */
   32, /* # highest class attribute number */
-  1, /* # class services */
+  2, /* # class services */ //TODO: check
   12, /* # instance attributes */
   12, /* # highest instance attribute number */
   3, /* # instance services */
@@ -540,4 +612,5 @@ EipStatus CipFileInit() {
 
   return CipFileCreateEDSAndIconFileInstance(); /* No instance number needed as this is fixed in the ENIP Spec */
 }
+
 
