@@ -462,12 +462,23 @@ EipStatus CipFilePostCreateCallback(
 	file_instance->state = kCipFileObjectStateFileEmpty;
 	file_instance->file_revision.major_revision = 0;
 	file_instance->file_revision.minor_revision = 0;
-
+        file_instance->file_name.number_of_strings = 0; //empty file name
 	file_instance->invocation_method = kCipFileInvocationMethodNotApplicable; //TODO: check
+        
+        file_instance->file_transfer_timeout = CIP_FILE_OBJECT_DEFAULT_TIMEOUT;
 
 	InsertAttribute(new_instance, 1, kCipUsint, EncodeCipUsint, NULL,  &file_instance->state, kGetableSingle);
 	InsertAttribute(new_instance, 2, kCipStringI, EncodeCipStringI, NULL, &file_instance->instance_name, kGetableSingle);
-	//TODO: check other attributes
+        InsertAttribute(new_instance, 3, kCipUint, EncodeCipUint, NULL, &file_instance->file_format_version, kGetableSingle);
+        InsertAttribute(new_instance, 4, kCipAny, EncodeCipStringI, NULL, &file_instance->file_name, kGetableSingle);
+        InsertAttribute(new_instance, 5, kCipAny, CipFileEncodeFileRevision, NULL, &file_instance->file_revision, kGetableSingle);
+        InsertAttribute(new_instance, 6, kCipUdint, EncodeCipUdint, NULL, &file_instance->file_size, kGetableSingle);
+        InsertAttribute(new_instance, 7, kCipUint, EncodeCipUint, NULL, &file_instance->file_checksum, kGetableSingle);
+        InsertAttribute(new_instance, 8, kCipUsint, EncodeCipUsint, NULL, &file_instance->invocation_method, kGetableSingle);
+        InsertAttribute(new_instance, 9, kCipByte, EncodeCipByte, NULL, &file_instance->file_save_parameters, kGetableSingle);
+        InsertAttribute(new_instance, 10, kCipUsint, EncodeCipUsint, NULL, &file_instance->file_access_rule, kGetableSingle);
+        InsertAttribute(new_instance, 11, kCipUsint, EncodeCipUsint, NULL, &file_instance->file_encoding_format, kGetableSingle);
+        InsertAttribute(new_instance, 12, kCipUsint, EncodeCipUsint, NULL, &file_instance->file_transfer_timeout, kSetAndGetAble);
 
 
 	AddIntToMessage(new_instance->instance_number, &(message_router_response->message));
