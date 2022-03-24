@@ -14,6 +14,8 @@
 #include "cipcommon.h"
 #include "opener_api.h"
 #include "trace.h"
+#include "cipstring.h"
+#include "cipstringi.h"
 
 #define STATIC_FILE_OBJECT_NUMBER_OF_INSTANCES 1
 #define CIP_FILE_OBJECT_DEFAULT_TIMEOUT 10U
@@ -433,56 +435,60 @@ EipStatus CipFilePreCreateCallback(
  *  Used for common Create service after new instance is created
  *  @See Vol.1, Chapter 5A-42.4.1
  */
-EipStatus CipFilePostCreateCallback(
-    CipInstance *RESTRICT const new_instance,
-    CipMessageRouterRequest *const message_router_request,
-    CipMessageRouterResponse *const message_router_response
-) {
+EipStatus CipFilePostCreateCallback(CipInstance *RESTRICT const new_instance,
+		CipMessageRouterRequest *const message_router_request,
+		CipMessageRouterResponse *const message_router_response) {
 
 	//TODO: check if instance_name is already in use
 
-	//TODO: get Encoding param from request - default 0
-
+	//create new file object struct
 	CipFileObjectValues *file_instance = CipCalloc(1, sizeof(CipFileObjectValues));
-	file_instance->instance_name.number_of_strings = GetUsintFromMessage(&message_router_request->data);
 
-	file_instance->instance_name.array_of_string_i_structs = CipCalloc(file_instance->instance_name.number_of_strings, sizeof(CipStringIStruct));
-	file_instance->instance_name.array_of_string_i_structs[0].language_char_1 = GetUsintFromMessage(&message_router_request->data);//'e'
-	file_instance->instance_name.array_of_string_i_structs[0].language_char_2 = GetUsintFromMessage(&message_router_request->data);//'n'
-	file_instance->instance_name.array_of_string_i_structs[0].language_char_3 = GetUsintFromMessage(&message_router_request->data);//'g'
-	file_instance->instance_name.array_of_string_i_structs[0].char_string_struct = GetUsintFromMessage(&message_router_request->data);//TODO: check: if DA - ShortString, ...
-	file_instance->instance_name.array_of_string_i_structs[0].character_set = GetUintFromMessage(&message_router_request->data);//kCipStringICharSet_ISO_8859_1_1987;
-	file_instance->instance_name.array_of_string_i_structs[0].string = CipCalloc(1, sizeof(CipShortString));
+	//get instance_name StringI from message - param 1
+	CipStringIDecodeFromMessage(&file_instance->instance_name,
+			message_router_request);
 
-	CipShortString *instance_name_string = (CipShortString*) (file_instance->instance_name.array_of_string_i_structs[0].string);
-	instance_name_string->length = GetUsintFromMessage(&message_router_request->data);
-	instance_name_string->string = (CipByte *)CipCalloc(instance_name_string->length, sizeof(CipByte));
-	memcpy(instance_name_string->string, message_router_request->data, instance_name_string->length);
+	//get Encoding format from message - param 2
+	file_instance->file_encoding_format = GetUsintFromMessage(&message_router_request->data);
 
+	//default values
 	file_instance->state = kCipFileObjectStateFileEmpty;
 	file_instance->file_revision.major_revision = 0;
 	file_instance->file_revision.minor_revision = 0;
-        file_instance->file_name.number_of_strings = 0; //empty file name
+	file_instance->file_name.number_of_strings = 0; //empty file name
 	file_instance->invocation_method = kCipFileInvocationMethodNotApplicable; //TODO: check
-        
-        file_instance->file_transfer_timeout = CIP_FILE_OBJECT_DEFAULT_TIMEOUT;
 
-	InsertAttribute(new_instance, 1, kCipUsint, EncodeCipUsint, NULL,  &file_instance->state, kGetableSingle);
-	InsertAttribute(new_instance, 2, kCipStringI, EncodeCipStringI, NULL, &file_instance->instance_name, kGetableSingle);
-        InsertAttribute(new_instance, 3, kCipUint, EncodeCipUint, NULL, &file_instance->file_format_version, kGetableSingle);
-        InsertAttribute(new_instance, 4, kCipAny, EncodeCipStringI, NULL, &file_instance->file_name, kGetableSingle);
-        InsertAttribute(new_instance, 5, kCipAny, CipFileEncodeFileRevision, NULL, &file_instance->file_revision, kGetableSingle);
-        InsertAttribute(new_instance, 6, kCipUdint, EncodeCipUdint, NULL, &file_instance->file_size, kGetableSingle);
-        InsertAttribute(new_instance, 7, kCipUint, EncodeCipUint, NULL, &file_instance->file_checksum, kGetableSingle);
-        InsertAttribute(new_instance, 8, kCipUsint, EncodeCipUsint, NULL, &file_instance->invocation_method, kGetableSingle);
-        InsertAttribute(new_instance, 9, kCipByte, EncodeCipByte, NULL, &file_instance->file_save_parameters, kGetableSingle);
-        InsertAttribute(new_instance, 10, kCipUsint, EncodeCipUsint, NULL, &file_instance->file_access_rule, kGetableSingle);
-        InsertAttribute(new_instance, 11, kCipUsint, EncodeCipUsint, NULL, &file_instance->file_encoding_format, kGetableSingle);
-        InsertAttribute(new_instance, 12, kCipUsint, EncodeCipUsint, NULL, &file_instance->file_transfer_timeout, kSetAndGetAble);
+	file_instance->file_transfer_timeout = CIP_FILE_OBJECT_DEFAULT_TIMEOUT;
 
+	InsertAttribute(new_instance, 1, kCipUsint, EncodeCipUsint, NULL,
+			&file_instance->state, kGetableSingle);
+	InsertAttribute(new_instance, 2, kCipStringI, EncodeCipStringI, NULL,
+			&file_instance->instance_name, kGetableSingle);
+	InsertAttribute(new_instance, 3, kCipUint, EncodeCipUint, NULL,
+			&file_instance->file_format_version, kGetableSingle);
+	InsertAttribute(new_instance, 4, kCipAny, EncodeCipStringI, NULL,
+			&file_instance->file_name, kGetableSingle);
+	InsertAttribute(new_instance, 5, kCipAny, CipFileEncodeFileRevision, NULL,
+			&file_instance->file_revision, kGetableSingle);
+	InsertAttribute(new_instance, 6, kCipUdint, EncodeCipUdint, NULL,
+			&file_instance->file_size, kGetableSingle);
+	InsertAttribute(new_instance, 7, kCipUint, EncodeCipUint, NULL,
+			&file_instance->file_checksum, kGetableSingle);
+	InsertAttribute(new_instance, 8, kCipUsint, EncodeCipUsint, NULL,
+			&file_instance->invocation_method, kGetableSingle);
+	InsertAttribute(new_instance, 9, kCipByte, EncodeCipByte, NULL,
+			&file_instance->file_save_parameters, kGetableSingle);
+	InsertAttribute(new_instance, 10, kCipUsint, EncodeCipUsint, NULL,
+			&file_instance->file_access_rule, kGetableSingle);
+	InsertAttribute(new_instance, 11, kCipUsint, EncodeCipUsint, NULL,
+			&file_instance->file_encoding_format, kGetableSingle);
+	InsertAttribute(new_instance, 12, kCipUsint, EncodeCipUsint, NULL,
+			&file_instance->file_transfer_timeout, kSetAndGetAble);
 
-	AddIntToMessage(new_instance->instance_number, &(message_router_response->message));
-	AddSintToMessage(file_instance->invocation_method, &(message_router_response->message)); //TODO: add invocation_method to response
+	AddIntToMessage(new_instance->instance_number,
+			&(message_router_response->message));
+	AddSintToMessage(file_instance->invocation_method,
+			&(message_router_response->message));
 	return kEipStatusOk;
 }
 
