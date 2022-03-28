@@ -1023,6 +1023,23 @@ EipStatus CipFilePostCreateCallback(CipInstance *RESTRICT const new_instance,
 	return internal_state;
 }
 
+/** @brief File Object PreDeleteCallback
+ *
+ *  Used for common Delete service before instance is deleted
+ */
+EipStatus CipFilePreDeleteCallback(
+    CipInstance *RESTRICT const instance,
+    CipMessageRouterRequest *const message_router_request,
+    CipMessageRouterResponse *const message_router_response
+) {
+  if (200 <=
+      instance->instance_number) {  // reserved instances should not be deleted
+    message_router_response->general_status = kCipErrorInstanceNotDeletable;
+    return kEipStatusError;
+  }
+  return kEipStatusOk;
+}
+
 void CipFileInitializeClassSettings(CipClass *cip_class) {
   CipClass *meta_class = cip_class->class_instance.cip_class;
 
@@ -1041,6 +1058,7 @@ void CipFileInitializeClassSettings(CipClass *cip_class) {
   // add Callback function pointers
   cip_class->PreCreateCallback = &CipFilePreCreateCallback;
   cip_class->PostCreateCallback = &CipFilePostCreateCallback;
+  cip_class->PreDeleteCallback = &CipFilePreDeleteCallback;
 
   cip_class->number_of_instances = 0;//kCipFileEDSAndIconFileInstanceNumber; /* Predefined instance for EDS File and Icon File */ //TODO: check
   cip_class->max_instance = kCipFileEDSAndIconFileInstanceNumber; /* Predefined instance for EDS File and Icon File */
@@ -1158,10 +1176,10 @@ EipStatus CipFileCreateEDSAndIconFileInstance() {
 EipStatus CipFileInit() {
   if(NULL == (file_object_class = CreateCipClass(kCipFileObjectClassCode, 7, /* # class attributes */
   32, /* # highest class attribute number */
-  2, /* # class services */ //TODO: check
+  2, /* # class services */
   12, /* # instance attributes */
   12, /* # highest instance attribute number */
-  6, /* # instance services */
+  7, /* # instance services */
   0, /* # instances - zero to suppress creation */
   "File Object", /* # debug name */
   3, /* # class revision */
@@ -1179,6 +1197,7 @@ EipStatus CipFileInit() {
   InsertService(file_object_class, kCipFileObjectInitiateDownloadServiceCode, &CipFileInitiateDownload, "CipFileObjectInitiateDownload");
   InsertService(file_object_class, kCipFileObjectDownloadTransferServiceCode, &CipFileDownloadTransfer, "CipFileObjectDownloadTransfer");
   InsertService(file_object_class, kCipFileObjectClearFileServiceCode, &CipFileClearFile, "CipFileObjectClearFile");
+  InsertService(file_object_class, kDelete, &CipDeleteService, "Delete");
 
   AddCipInstance(file_object_class, kCipFileEDSAndIconFileInstanceNumber);
   if(kEipStatusError == CreateFileObject(kCipFileEDSAndIconFileInstanceNumber, eds_file_instance, false)) {
