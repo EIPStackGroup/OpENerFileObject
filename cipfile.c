@@ -946,6 +946,26 @@ EipStatus CipFileClearFileImplementation(CipInstance *RESTRICT const instance, C
   return kEipStatusOkSend;
 }
 
+EipStatus CreateFileObject(unsigned int instance_nr, CipFileObjectValues *const instance_values, bool file_access_setable) {
+  CipInstance *instance = GetCipInstance(file_object_class, instance_nr);
+
+  InsertAttribute(instance, 1, kCipUsint, EncodeCipUsint, NULL, &instance_values->state, kGetableSingle);
+  InsertAttribute(instance, 2, kCipStringI, EncodeCipStringI, NULL, &instance_values->instance_name, kGetableSingle);
+  InsertAttribute(instance, 3, kCipUint, EncodeCipUint, NULL, &instance_values->file_format_version, kGetableSingle);
+  InsertAttribute(instance, 4, kCipAny, EncodeCipStringI, NULL, &instance_values->file_name, kGetableSingle);
+  InsertAttribute(instance, 5, kCipAny, CipFileEncodeFileRevision, NULL, &instance_values->file_revision, kGetableSingle);
+  InsertAttribute(instance, 6, kCipUdint, EncodeCipUdint, NULL, &instance_values->file_size, kGetableSingle);
+  InsertAttribute(instance, 7, kCipUint, EncodeCipUint, NULL, &instance_values->file_checksum, kGetableSingle);
+  InsertAttribute(instance, 8, kCipUsint, EncodeCipUsint, NULL, &instance_values->invocation_method, kGetableSingle);
+  InsertAttribute(instance, 9, kCipByte, EncodeCipByte, NULL, &instance_values->file_save_parameters, kGetableSingle);
+  InsertAttribute(instance, 10, kCipUsint, EncodeCipUsint, NULL, &instance_values->file_access_rule, file_access_setable ? kSetAndGetAble : kGetableSingle);
+  InsertAttribute(instance, 11, kCipUsint, EncodeCipUsint, NULL, &instance_values->file_encoding_format, kGetableSingle);
+  InsertAttribute(instance, 12, kCipUsint, EncodeCipUsint, NULL, &instance_values->file_transfer_timeout, kSetAndGetAble);
+  /* Default values*/
+  instance_values->file_transfer_timeout = CIP_FILE_OBJECT_DEFAULT_TIMEOUT;
+  return kEipStatusOk;
+}
+
 /** @brief File Object PreCreateCallback
  *
  *  Used for common Create service before new instance is created
@@ -991,60 +1011,16 @@ EipStatus CipFilePostCreateCallback(CipInstance *RESTRICT const new_instance,
 	file_instance->file_revision.major_revision = 0;
 	file_instance->file_revision.minor_revision = 0;
 	file_instance->file_name.number_of_strings = 0; //empty file name
-	file_instance->invocation_method = kCipFileInvocationMethodNotApplicable; //TODO: check
+	file_instance->invocation_method = kCipFileInvocationMethodNotApplicable;
 
-	file_instance->file_transfer_timeout = CIP_FILE_OBJECT_DEFAULT_TIMEOUT;
-
-	InsertAttribute(new_instance, 1, kCipUsint, EncodeCipUsint, NULL,
-			&file_instance->state, kGetableSingle);
-	InsertAttribute(new_instance, 2, kCipStringI, EncodeCipStringI, NULL,
-			&file_instance->instance_name, kGetableSingle);
-	InsertAttribute(new_instance, 3, kCipUint, EncodeCipUint, NULL,
-			&file_instance->file_format_version, kGetableSingle);
-	InsertAttribute(new_instance, 4, kCipAny, EncodeCipStringI, NULL,
-			&file_instance->file_name, kGetableSingle);
-	InsertAttribute(new_instance, 5, kCipAny, CipFileEncodeFileRevision, NULL,
-			&file_instance->file_revision, kGetableSingle);
-	InsertAttribute(new_instance, 6, kCipUdint, EncodeCipUdint, NULL,
-			&file_instance->file_size, kGetableSingle);
-	InsertAttribute(new_instance, 7, kCipUint, EncodeCipUint, NULL,
-			&file_instance->file_checksum, kGetableSingle);
-	InsertAttribute(new_instance, 8, kCipUsint, EncodeCipUsint, NULL,
-			&file_instance->invocation_method, kGetableSingle);
-	InsertAttribute(new_instance, 9, kCipByte, EncodeCipByte, NULL,
-			&file_instance->file_save_parameters, kGetableSingle);
-	InsertAttribute(new_instance, 10, kCipUsint, EncodeCipUsint, NULL,
-			&file_instance->file_access_rule, kGetableSingle);
-	InsertAttribute(new_instance, 11, kCipUsint, EncodeCipUsint, NULL,
-			&file_instance->file_encoding_format, kGetableSingle);
-	InsertAttribute(new_instance, 12, kCipUsint, EncodeCipUsint, NULL,
-			&file_instance->file_transfer_timeout, kSetAndGetAble);
+        EipStatus internal_state = CreateFileObject(new_instance->instance_number,
+                                                    file_instance, false);
 
 	AddIntToMessage(new_instance->instance_number,
 			&(message_router_response->message));
 	AddSintToMessage(file_instance->invocation_method,
 			&(message_router_response->message));
-	return kEipStatusOk;
-}
-
-EipStatus CreateFileObject(unsigned int instance_nr, CipFileObjectValues *const instance_values, bool file_access_setable) {
-  CipInstance *instance = GetCipInstance(file_object_class, instance_nr);
-
-  InsertAttribute(instance, 1, kCipUsint, EncodeCipUsint, NULL, &instance_values->state, kGetableSingle);
-  InsertAttribute(instance, 2, kCipStringI, EncodeCipStringI, NULL, &instance_values->instance_name, kGetableSingle);
-  InsertAttribute(instance, 3, kCipUint, EncodeCipUint, NULL, &instance_values->file_format_version, kGetableSingle);
-  InsertAttribute(instance, 4, kCipAny, EncodeCipStringI, NULL, &instance_values->file_name, kGetableSingle);
-  InsertAttribute(instance, 5, kCipAny, CipFileEncodeFileRevision, NULL, &instance_values->file_revision, kGetableSingle);
-  InsertAttribute(instance, 6, kCipUdint, EncodeCipUdint, NULL, &instance_values->file_size, kGetableSingle);
-  InsertAttribute(instance, 7, kCipUint, EncodeCipUint, NULL, &instance_values->file_checksum, kGetableSingle);
-  InsertAttribute(instance, 8, kCipUsint, EncodeCipUsint, NULL, &instance_values->invocation_method, kGetableSingle);
-  InsertAttribute(instance, 9, kCipByte, EncodeCipByte, NULL, &instance_values->file_save_parameters, kGetableSingle);
-  InsertAttribute(instance, 10, kCipUsint, EncodeCipUsint, NULL, &instance_values->file_access_rule, file_access_setable ? kSetAndGetAble : kGetableSingle);
-  InsertAttribute(instance, 11, kCipUsint, EncodeCipUsint, NULL, &instance_values->file_encoding_format, kGetableSingle);
-  InsertAttribute(instance, 12, kCipUsint, EncodeCipUsint, NULL, &instance_values->file_transfer_timeout, kSetAndGetAble);
-  /* Default values*/
-  instance_values->file_transfer_timeout = CIP_FILE_OBJECT_DEFAULT_TIMEOUT;
-  return kEipStatusOk;
+	return internal_state;
 }
 
 void CipFileInitializeClassSettings(CipClass *cip_class) {
