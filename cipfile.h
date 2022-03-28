@@ -13,8 +13,15 @@
 
 static const CipUint kCipFileObjectClassCode = 0x37U;
 
+#define CIP_FILE_OBJECT_MAXIMUM_TRANSFER_SIZE 100U
+#define CIP_FILE_MAX_SIZE_IN_KB 10U
+#define CIP_FILE_MAX_TRANSFERABLE_SIZE (1024U * CIP_FILE_MAX_SIZE_IN_KB) /* 1024 = 1kByte, times CIP_FILE_MAX_SIZE_IN_KB */
+
 static const CipUint kCipFileObjectInitiateUploadServiceCode = 0x4BU;
 static const CipUint kCipFileObjectUploadTransferServiceCode = 0x4FU;
+static const CipUint kCipFileObjectInitiateDownloadServiceCode = 0x4CU;
+static const CipUint kCipFileObjectDownloadTransferServiceCode = 0x50U;
+static const CipUint kCipFileObjectClearFileServiceCode = 0x51U;
 
 typedef struct cip_file_object_file_revision {
     CipUsint major_revision;
@@ -36,17 +43,17 @@ typedef enum cip_file_object_file_access_rule {
 } CipFileObjectFileAccessRule;
 
 typedef enum cip_file_object_file_encoding_format {
-  kCipFileObjectFileEncodinfFormatBinary = 0,
-  kCipFileObjectFileEncodinfFormatCompressedFile = 1, /*<< ZLIB compression */
-  kCipFileObjectFileEncodinfFormatPEMEncodedCertificate = 2,
-  kCipFileObjectFileEncodinfFormatPKCS7EncodedCertificate = 3,
-  kCipFileObjectFileEncodinfFormatPEMEncodedCRL = 4,
-  kCipFileObjectFileEncodinfFormatPKS7EncodedCRL = 5,
-  kCipFileObjectFileEncodinfFormatASCIIText = 11,
-  kCipFileObjectFileEncodinfFormatWord = 12, /*<< doc, docx */
-  kCipFileObjectFileEncodinfFormatExcel = 13, /*<< xls, xlsx */
-  kCipFileObjectFileEncodinfFormatPDF = 14, /*<< pdf */
-  kCipFileObjectFileEncodinfFormatUnkown = 255
+  kCipFileObjectFileEncodingFormatBinary = 0,
+  kCipFileObjectFileEncodingFormatCompressedFile = 1, /*<< ZLIB compression */
+  kCipFileObjectFileEncodingFormatPEMEncodedCertificate = 2,
+  kCipFileObjectFileEncodingFormatPKCS7EncodedCertificate = 3,
+  kCipFileObjectFileEncodingFormatPEMEncodedCRL = 4,
+  kCipFileObjectFileEncodingFormatPKS7EncodedCRL = 5,
+  kCipFileObjectFileEncodingFormatASCIIText = 11,
+  kCipFileObjectFileEncodingFormatWord = 12, /*<< doc, docx */
+  kCipFileObjectFileEncodingFormatExcel = 13, /*<< xls, xlsx */
+  kCipFileObjectFileEncodingFormatPDF = 14, /*<< pdf */
+  kCipFileObjectFileEncodingFormatUnkown = 255
 } CipFileObjectFileEncodingFormat;
 
 typedef enum cip_file_transfer_packet_type {
@@ -75,6 +82,12 @@ typedef struct cip_file_object_values {
     /* Non CIP values */
     FILE *file_handle; /* TODO: Make platform independent */
     CipFileObjectUploadSession *aquired_session;
+
+    /* Function pointers if an object supports Download/Clear or not! */
+    CipServiceFunction initiate_download;
+    CipServiceFunction download_transfer;
+    CipServiceFunction clear_file;
+    CipOctet data[CIP_FILE_MAX_TRANSFERABLE_SIZE];
 } CipFileObjectValues;
 
 EipStatus CipFileInit(void);
