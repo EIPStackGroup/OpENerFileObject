@@ -112,6 +112,8 @@ typedef enum cip_file_object_state {
   kCipFileObjectStateStoring
 } CipFileObjectState;
 
+void CipFileSetDownloadAndClearSupported(CipFileObjectValues *const file_instance); //TODO: remove
+
 CipFileObjectUploadSession* CipFileGetUnusedUploadSession() {
   for(size_t i = 0; i < CIP_FILE_UPLOAD_SESSIONS; ++i) {
     if(false == upload_sessions[i].inUse) {
@@ -204,6 +206,10 @@ static CipFileObjectValues* CipFileObjectGetDataStruct(const CipInstance *RESTRI
       return &file_object_values[i];
     }
   }
+  if(NULL != instance->data){// TODO: check if function can be replaced with data struct pointer
+	  return instance->data;
+  }
+
   return NULL;
 }
 
@@ -966,23 +972,65 @@ EipStatus CreateFileObject(unsigned int instance_nr, CipFileObjectValues *const 
   return kEipStatusOk;
 }
 
-/** @brief File Object PreCreateCallback
+/** @brief File Object Delete Instance Data
  *
- *  Used for common Create service before new instance is created
- *  @See Vol.1, Chapter 5A-42.4.1
+ *  Used for common Delete service to delete instance struct before instance is deleted
  */
-EipStatus CipFilePreCreateCallback(
+EipStatus CipFileDeleteInstanceData(
     CipInstance *RESTRICT const instance,
     CipMessageRouterRequest *const message_router_request,
     CipMessageRouterResponse *const message_router_response
 ) {
 
-  if (message_router_request->request_data_size > 0) {
-    return kEipStatusOk;
-  } else {
-    message_router_response->general_status = kCipErrorNotEnoughData;
-    return kEipStatusError;
-  }
+  //TODO: get struct and free elements
+
+  CipFree(instance->data);
+
+
+  return kEipStatusOk;
+}
+
+/** @brief File Object PreCreateCallback
+ *
+ *  Used for common Create service before new instance is created
+ *  @See Vol.1, Chapter 5A-42.4.1
+ */
+EipStatus CipFilePreCreateCallback(CipInstance *RESTRICT const instance,
+		CipMessageRouterRequest *const message_router_request,
+		CipMessageRouterResponse *const message_router_response) {
+
+	if (message_router_request->request_data_size > 0) {
+
+		//check if instance_name is already in use
+		CipOctet *message_data = message_router_request->data; //get message data pointer
+
+		CipStringI *new_instance_name = CipCalloc(1, sizeof(CipStringI));
+		CipStringIDecodeFromMessage(new_instance_name, message_router_request);
+
+		message_router_request->data = message_data; //reset message data pointer
+
+		CipInstance *instances = file_object_class->instances;
+
+		while (NULL != instances->next) {
+			CipAttributeStruct *attribute = GetCipAttribute(instances, 2); //instance_name
+			CipStringI *name = (CipStringI*) attribute->data;
+
+			if (CipStringICompare(new_instance_name, name)) {
+				// string exists
+				OPENER_TRACE_INFO("Error: instance_name exists already \n");
+				message_router_response->general_status =
+						kCipErrorInvalidParameter;
+				CipFree(new_instance_name);
+				return kEipStatusError;
+			}
+			instances = instances->next;
+		}
+		CipFree(new_instance_name);
+		return kEipStatusOk;
+	} else {
+		message_router_response->general_status = kCipErrorNotEnoughData;
+		return kEipStatusError;
+	}
 }
 
 /** @brief File Object PostCreateCallback
@@ -993,8 +1041,6 @@ EipStatus CipFilePreCreateCallback(
 EipStatus CipFilePostCreateCallback(CipInstance *RESTRICT const new_instance,
 		CipMessageRouterRequest *const message_router_request,
 		CipMessageRouterResponse *const message_router_response) {
-
-	//TODO: check if instance_name is already in use
 
 	//create new file object struct
 	CipFileObjectValues *file_instance = CipCalloc(1, sizeof(CipFileObjectValues));
@@ -1013,15 +1059,21 @@ EipStatus CipFilePostCreateCallback(CipInstance *RESTRICT const new_instance,
 	file_instance->file_name.number_of_strings = 0; //empty file name
 	file_instance->invocation_method = kCipFileInvocationMethodNotApplicable;
 
-        EipStatus internal_state = CreateFileObject(new_instance->instance_number,
+    EipStatus internal_state = CreateFileObject(new_instance->instance_number,
                                                     file_instance, false);
+
+    new_instance->data = file_instance;
+    CipFileSetDownloadAndClearSupported(file_instance); // TODO: map to instance
+    file_instance->delete_instance_data = &CipFileDeleteInstanceData;
 
 	AddIntToMessage(new_instance->instance_number,
 			&(message_router_response->message));
 	AddSintToMessage(file_instance->invocation_method,
 			&(message_router_response->message));
+
 	return internal_state;
 }
+
 
 /** @brief File Object PreDeleteCallback
  *
@@ -1032,12 +1084,20 @@ EipStatus CipFilePreDeleteCallback(
     CipMessageRouterRequest *const message_router_request,
     CipMessageRouterResponse *const message_router_response
 ) {
-  if (200 <=
-      instance->instance_number) {  // reserved instances should not be deleted
+
+	EipStatus internal_state = kEipStatusOk;
+
+	CipFileObjectValues *file_instance = instance->data;
+
+  if (NULL == file_instance->delete_instance_data) {
     message_router_response->general_status = kCipErrorInstanceNotDeletable;
-    return kEipStatusError;
+    internal_state =  kEipStatusError;
   }
-  return kEipStatusOk;
+  else{
+	  internal_state = CipFileDeleteInstanceData(instance, message_router_request,
+	                                                    message_router_response);
+  }
+  return internal_state;
 }
 
 void CipFileInitializeClassSettings(CipClass *cip_class) {
@@ -1199,18 +1259,22 @@ EipStatus CipFileInit() {
   InsertService(file_object_class, kCipFileObjectClearFileServiceCode, &CipFileClearFile, "CipFileObjectClearFile");
   InsertService(file_object_class, kDelete, &CipDeleteService, "Delete");
 
-  AddCipInstance(file_object_class, kCipFileEDSAndIconFileInstanceNumber);
+  CipInstance *new_instance = AddCipInstance(file_object_class, kCipFileEDSAndIconFileInstanceNumber);
   if(kEipStatusError == CreateFileObject(kCipFileEDSAndIconFileInstanceNumber, eds_file_instance, false)) {
     return kEipStatusError;
   }
   CipFileSetDownloadAndClearNotSupported(eds_file_instance);
+  eds_file_instance->delete_instance_data = NULL; // not deletable
+  new_instance->data = eds_file_instance; // data struct pointer for instance
 
-  AddCipInstance(file_object_class, 1);
+  new_instance = AddCipInstance(file_object_class, 1);
   if(kEipStatusError == CreateFileObject(1, &file_object_values[1], true)) {
     return kEipStatusError;
   }
   CipFileConfigureReadWriteInstance(&file_object_values[1]);
   CipFileSetDownloadAndClearSupported(&file_object_values[1]);
+  file_object_values[1].delete_instance_data = NULL; // not deletable
+  new_instance->data = &file_object_values[1]; // data struct pointer for instance
 
   const char instance_1_name[] = "File Instance 1";
 

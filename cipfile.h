@@ -87,6 +87,7 @@ typedef struct cip_file_object_values {
     CipServiceFunction initiate_download;
     CipServiceFunction download_transfer;
     CipServiceFunction clear_file;
+    CipServiceFunction delete_instance_data;
     CipOctet data[CIP_FILE_MAX_TRANSFERABLE_SIZE];
 } CipFileObjectValues;
 
