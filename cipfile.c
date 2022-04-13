@@ -999,7 +999,7 @@ EipStatus CipFilePreCreateCallback(CipInstance *RESTRICT const instance,
 		CipMessageRouterRequest *const message_router_request,
 		CipMessageRouterResponse *const message_router_response) {
 
-	if (message_router_request->request_data_size > 0) {
+	if (message_router_request->request_data_size > 0) { //check if message contains data
 
 		//check if instance_name is already in use
 		CipOctet *message_data = message_router_request->data; //get message data pointer
@@ -1011,7 +1011,7 @@ EipStatus CipFilePreCreateCallback(CipInstance *RESTRICT const instance,
 
 		CipInstance *instances = file_object_class->instances;
 
-		while (NULL != instances->next) {
+		while (NULL != instances) {
 			CipAttributeStruct *attribute = GetCipAttribute(instances, 2); //instance_name
 			CipStringI *name = (CipStringI*) attribute->data;
 
