@@ -936,10 +936,14 @@ EipStatus CipFileDeleteInstanceData(
     CipMessageRouterResponse *const message_router_response
 ) {
 
-  //TODO: get struct and free elements
+  /*get struct and free elements*/
+  CipFileObjectValues *instance_data_struct = CipFileObjectGetDataStruct(instance);
 
-  CipFree(instance->data);
+  CipStringIDelete(&instance_data_struct->instance_name);
+  CipStringIDelete(&instance_data_struct->file_name);
 
+  CipFree(instance_data_struct);
+  instance_data_struct = NULL;
 
   return kEipStatusOk;
 }
@@ -1157,18 +1161,7 @@ EipStatus CipFileCreateEDSAndIconFileInstance() {
   eds_file_instance->file_access_rule = kCipFileObjectFileAccessRuleReadOnly;
   eds_file_instance->file_encoding_format = kCipFileObjectFileEncodingFormatBinary;
 
-  eds_file_instance->instance_name.number_of_strings = 1;
-  eds_file_instance->instance_name.array_of_string_i_structs = CipCalloc(eds_file_instance->instance_name.number_of_strings, sizeof(CipStringIStruct));
-  eds_file_instance->instance_name.array_of_string_i_structs[0].language_char_1 = 'e';
-  eds_file_instance->instance_name.array_of_string_i_structs[0].language_char_2 = 'n';
-  eds_file_instance->instance_name.array_of_string_i_structs[0].language_char_3 = 'g';
-  eds_file_instance->instance_name.array_of_string_i_structs[0].character_set = kCipStringICharSet_ISO_8859_1_1987;
-  eds_file_instance->instance_name.array_of_string_i_structs[0].char_string_struct = kCipShortString;
-  eds_file_instance->instance_name.array_of_string_i_structs[0].string = CipCalloc(1, sizeof(CipShortString));
-  CipShortString *instance_name_short_string = (CipShortString*) (eds_file_instance->instance_name.array_of_string_i_structs[0].string);
-  instance_name_short_string->length = sizeof(instance_name_string) - 1;
-  instance_name_short_string->string = CipCalloc(sizeof(instance_name_string), sizeof(EipByte));
-  memcpy(instance_name_short_string->string, instance_name_string, sizeof(instance_name_string));
+  CipFileSetInstanceName(eds_file_instance, instance_name_string, sizeof(instance_name_string));
 
   char file_name_string[] = "EDS.txt";
   eds_file_instance->file_name.number_of_strings = 1;
