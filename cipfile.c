@@ -112,7 +112,7 @@ typedef enum cip_file_object_state {
   kCipFileObjectStateStoring
 } CipFileObjectState;
 
-void CipFileSetDownloadAndClearSupported(CipFileObjectValues *const file_instance); //TODO: remove
+void CipFileSetDownloadAndClearSupported(CipFileObjectValues *const file_instance);
 
 CipFileObjectUploadSession* CipFileGetUnusedUploadSession() {
   for(size_t i = 0; i < CIP_FILE_UPLOAD_SESSIONS; ++i) {
@@ -463,54 +463,8 @@ static CipFileObjectState InitiateDownload(CipInstance *RESTRICT const instance,
   download_sessions[0].file_format_version = GetUintFromMessage(&message_router_request->data);
   download_sessions[0].file_revision.major_revision = GetUsintFromMessage(&message_router_request->data);
   download_sessions[0].file_revision.minor_revision = GetUsintFromMessage(&message_router_request->data);
-
-  download_sessions[0].file_name.number_of_strings = GetUsintFromMessage(&message_router_request->data);
-  download_sessions[0].file_name.array_of_string_i_structs = CipCalloc(download_sessions[0].file_name.number_of_strings, sizeof(CipStringIStruct));
-  for(size_t i = 0; i < download_sessions[0].file_name.number_of_strings; ++i) {
-    download_sessions[0].file_name.array_of_string_i_structs[i].language_char_1 = GetUsintFromMessage(&message_router_request->data);
-    download_sessions[0].file_name.array_of_string_i_structs[i].language_char_2 = GetUsintFromMessage(&message_router_request->data);
-    download_sessions[0].file_name.array_of_string_i_structs[i].language_char_3 = GetUsintFromMessage(&message_router_request->data);
-    download_sessions[0].file_name.array_of_string_i_structs[i].char_string_struct = GetUsintFromMessage(&message_router_request->data);
-    download_sessions[0].file_name.array_of_string_i_structs[i].character_set = GetUintFromMessage(&message_router_request->data);
-    switch(download_sessions[0].file_name.array_of_string_i_structs[i].char_string_struct){
-      case kCipShortString: {
-        download_sessions[0].file_name.array_of_string_i_structs[i].string = CipCalloc(1, sizeof(CipShortString));
-        CipShortString *const short_string = (CipShortString* const ) download_sessions[0].file_name.array_of_string_i_structs[i].string;
-        CipUsint length = GetUsintFromMessage(&message_router_request->data);
-        SetCipShortStringByData(short_string, length, message_router_request->data);
-        message_router_request->data += length;
-      }
-        break;
-      case kCipString: {
-        download_sessions[0].file_name.array_of_string_i_structs[i].string = CipCalloc(1, sizeof(CipString));
-        CipString *const string = (CipString* const ) download_sessions[0].file_name.array_of_string_i_structs[i].string;
-        CipUint length = GetUintFromMessage(&message_router_request->data);
-        SetCipStringByData(string, length, message_router_request->data);
-        message_router_request->data += length;
-      }
-        break;
-      case kCipString2: {
-        download_sessions[0].file_name.array_of_string_i_structs[i].string = CipCalloc(1, sizeof(CipString2));
-        CipString2 *const string = (CipString2* const ) download_sessions[0].file_name.array_of_string_i_structs[i].string;
-        CipUint length = GetUintFromMessage(&message_router_request->data);
-        SetCipString2ByData(string, length, message_router_request->data);
-        message_router_request->data += length * 2 * sizeof(CipOctet);
-      }
-        break;
-      case kCipStringN: {
-        CipUint size = GetUintFromMessage(&message_router_request->data);
-        CipUint length = GetUintFromMessage(&message_router_request->data);
-
-        download_sessions[0].file_name.array_of_string_i_structs[i].string = CipCalloc(1, sizeof(CipStringN));
-        CipStringN *const string = (CipStringN* const ) download_sessions[0].file_name.array_of_string_i_structs[i].string;
-        SetCipStringNByData(string, length, size, message_router_request->data);
-        message_router_request->data += length * size;
-      }
-        break;
-      default:
-        OPENER_TRACE_ERR("CIP File: No valid String type received!\n");
-    }
-  }
+  //get filename from message
+  CipStringIDecodeFromMessage(&download_sessions[0].file_name, message_router_request);
 
   /* Check for errors */
   if(CIP_FILE_MAX_TRANSFERABLE_SIZE < download_sessions[0].file_size) {
@@ -1020,12 +974,12 @@ EipStatus CipFilePreCreateCallback(CipInstance *RESTRICT const instance,
 				OPENER_TRACE_INFO("Error: instance_name exists already \n");
 				message_router_response->general_status =
 						kCipErrorInvalidParameter;
-				CipFree(new_instance_name);
+				CipStringIDelete(new_instance_name);
 				return kEipStatusError;
 			}
 			instances = instances->next;
 		}
-		CipFree(new_instance_name);
+		CipStringIDelete(new_instance_name);
 		return kEipStatusOk;
 	} else {
 		message_router_response->general_status = kCipErrorNotEnoughData;
