@@ -200,17 +200,10 @@ void GenerateResponseHeader(const CipFileInitiateGeneralStatusCode general_statu
 }
 
 static CipFileObjectValues* CipFileObjectGetDataStruct(const CipInstance *RESTRICT const instance) {
-	// TODO: check if loop can be removed using instance data struct pointer update
-  for(size_t i = 0; i < STATIC_FILE_OBJECT_NUMBER_OF_INSTANCES; ++i) {
-    CipAttributeStruct *file_name_struct = GetCipAttribute(instance, 4);
-    if(file_name_struct->data == &file_object_values[i].file_name) { /* Same string address = same instance object */
-      return &file_object_values[i];
-    }
-  }
+
   if(NULL != instance->data){
 	  return instance->data;
   }
-
   return NULL;
 }
 
