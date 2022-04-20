@@ -22,7 +22,7 @@
 
 static CipClass *file_object_class = NULL;
 
-static CipFileObjectValues file_object_values[STATIC_FILE_OBJECT_NUMBER_OF_INSTANCES]; //TODO: change ??
+static CipFileObjectValues file_object_values[STATIC_FILE_OBJECT_NUMBER_OF_INSTANCES];
 
 static CipFileObjectValues *eds_file_instance = &file_object_values[0]; /* EDS file instance*/
 
@@ -200,13 +200,14 @@ void GenerateResponseHeader(const CipFileInitiateGeneralStatusCode general_statu
 }
 
 static CipFileObjectValues* CipFileObjectGetDataStruct(const CipInstance *RESTRICT const instance) {
+	// TODO: check if loop can be removed using instance data struct pointer update
   for(size_t i = 0; i < STATIC_FILE_OBJECT_NUMBER_OF_INSTANCES; ++i) {
     CipAttributeStruct *file_name_struct = GetCipAttribute(instance, 4);
     if(file_name_struct->data == &file_object_values[i].file_name) { /* Same string address = same instance object */
       return &file_object_values[i];
     }
   }
-  if(NULL != instance->data){// TODO: check if function can be replaced with data struct pointer
+  if(NULL != instance->data){
 	  return instance->data;
   }
 
@@ -1021,7 +1022,7 @@ EipStatus CipFilePostCreateCallback(CipInstance *RESTRICT const new_instance,
                                                     file_instance, false);
 
     new_instance->data = file_instance;
-    CipFileSetDownloadAndClearSupported(file_instance); // TODO: map to instance
+    CipFileSetDownloadAndClearSupported(file_instance);
     file_instance->delete_instance_data = &CipFileDeleteInstanceData;
 
 	AddIntToMessage(new_instance->instance_number,
@@ -1078,7 +1079,7 @@ void CipFileInitializeClassSettings(CipClass *cip_class) {
   cip_class->PostCreateCallback = &CipFilePostCreateCallback;
   cip_class->PreDeleteCallback = &CipFilePreDeleteCallback;
 
-  cip_class->number_of_instances = 0;//kCipFileEDSAndIconFileInstanceNumber; /* Predefined instance for EDS File and Icon File */ //TODO: check
+  cip_class->number_of_instances = 0;
   cip_class->max_instance = kCipFileEDSAndIconFileInstanceNumber; /* Predefined instance for EDS File and Icon File */
 }
 
@@ -1206,6 +1207,7 @@ EipStatus CipFileInit() {
   InsertService(file_object_class, kCipFileObjectClearFileServiceCode, &CipFileClearFile, "CipFileObjectClearFile");
   InsertService(file_object_class, kDelete, &CipDeleteService, "Delete");
 
+  /*Add static EDS File Instance 200*/
   CipInstance *new_instance = AddCipInstance(file_object_class, kCipFileEDSAndIconFileInstanceNumber);
   if(kEipStatusError == CreateFileObject(kCipFileEDSAndIconFileInstanceNumber, eds_file_instance, false)) {
     return kEipStatusError;
@@ -1214,6 +1216,7 @@ EipStatus CipFileInit() {
   eds_file_instance->delete_instance_data = NULL; // not deletable
   new_instance->data = eds_file_instance; // data struct pointer for instance
 
+  /*Add static File Instance 1*/
   new_instance = AddCipInstance(file_object_class, 1);
   if(kEipStatusError == CreateFileObject(1, &file_object_values[1], true)) {
     return kEipStatusError;
