@@ -200,11 +200,7 @@ void GenerateResponseHeader(const CipFileInitiateGeneralStatusCode general_statu
 }
 
 static CipFileObjectValues* CipFileObjectGetDataStruct(const CipInstance *RESTRICT const instance) {
-
-  if(NULL != instance->data){
-	  return instance->data;
-  }
-  return NULL;
+  return instance->data;
 }
 
 CipUint CipFileCalculateChecksumFromArray(const CipUdint file_size, const CipOctet *file_content) {
