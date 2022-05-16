@@ -24,8 +24,8 @@ static const CipUint kCipFileObjectDownloadTransferServiceCode = 0x50U;
 static const CipUint kCipFileObjectClearFileServiceCode = 0x51U;
 
 typedef struct cip_file_object_file_revision {
-    CipUsint major_revision;
-    CipUsint minor_revision;
+  CipUsint major_revision;
+  CipUsint minor_revision;
 } CipFileObjectFileRevision;
 
 typedef enum cip_file_object_invokation_method_values {
@@ -67,27 +67,28 @@ typedef enum cip_file_transfer_packet_type {
 typedef struct cip_file_upload_session CipFileObjectUploadSession;
 
 typedef struct cip_file_object_values {
-    CipUsint state; /**< Valid values are the ones in @ref CipFileStateValue*/
-    CipStringI instance_name;
-    CipUint file_format_version;
-    CipStringI file_name;
-    CipFileObjectFileRevision file_revision;
-    CipUdint file_size;
-    CipUint file_checksum;
-    CipUsint invocation_method;
-    CipByte file_save_parameters;
-    CipUsint file_access_rule;
-    CipUsint file_encoding_format;
-    CipUsint file_transfer_timeout;
-    /* Non CIP values */
-    FILE *file_handle; /* TODO: Make platform independent */
-    CipFileObjectUploadSession *aquired_session;
+  CipUsint state;   /**< Valid values are the ones in @ref CipFileStateValue*/
+  CipStringI instance_name;
+  CipUint file_format_version;
+  CipStringI file_name;
+  CipFileObjectFileRevision file_revision;
+  CipUdint file_size;
+  CipUint file_checksum;
+  CipUsint invocation_method;
+  CipByte file_save_parameters;
+  CipUsint file_access_rule;
+  CipUsint file_encoding_format;
+  CipUsint file_transfer_timeout;
+  /* Non CIP values */
+  FILE *file_handle;   /* TODO: Make platform independent */
+  CipFileObjectUploadSession *aquired_session;
 
-    /* Function pointers if an object supports Download/Clear or not! */
-    CipServiceFunction initiate_download;
-    CipServiceFunction download_transfer;
-    CipServiceFunction clear_file;
-    CipOctet data[CIP_FILE_MAX_TRANSFERABLE_SIZE];
+  /* Function pointers if an object supports Download/Clear or not! */
+  CipServiceFunction initiate_download;
+  CipServiceFunction download_transfer;
+  CipServiceFunction clear_file;
+  CipServiceFunction delete_instance_data;
+  CipOctet data[CIP_FILE_MAX_TRANSFERABLE_SIZE];
 } CipFileObjectValues;
 
 EipStatus CipFileInit(void);

@@ -28,7 +28,7 @@ static CipFileObjectValues *eds_file_instance = &file_object_values[0]; /* EDS f
 
 static CipBool dummy_attribute;
 
-static const CipUint kCipFileEDSAndIconFileInstanceNumber = 0xC8U;
+static const CipUint kCipFileEDSAndIconFileInstanceNumber = 0xC8U; //200
 
 typedef struct cip_file_upload_session {
   bool inUse;
@@ -111,6 +111,8 @@ typedef enum cip_file_object_state {
   kCipFileObjectStateTransferDownloadInProgress,
   kCipFileObjectStateStoring
 } CipFileObjectState;
+
+void CipFileSetDownloadAndClearSupported(CipFileObjectValues *const file_instance);
 
 CipFileObjectUploadSession* CipFileGetUnusedUploadSession() {
   for(size_t i = 0; i < CIP_FILE_UPLOAD_SESSIONS; ++i) {
@@ -198,13 +200,7 @@ void GenerateResponseHeader(const CipFileInitiateGeneralStatusCode general_statu
 }
 
 static CipFileObjectValues* CipFileObjectGetDataStruct(const CipInstance *RESTRICT const instance) {
-  for(size_t i = 0; i < STATIC_FILE_OBJECT_NUMBER_OF_INSTANCES; ++i) {
-    CipAttributeStruct *file_name_struct = GetCipAttribute(instance, 4);
-    if(file_name_struct->data == &file_object_values[i].file_name) { /* Same string address = same instance object */
-      return &file_object_values[i];
-    }
-  }
-  return NULL;
+  return instance->data;
 }
 
 CipUint CipFileCalculateChecksumFromArray(const CipUdint file_size, const CipOctet *file_content) {
@@ -457,54 +453,8 @@ static CipFileObjectState InitiateDownload(CipInstance *RESTRICT const instance,
   download_sessions[0].file_format_version = GetUintFromMessage(&message_router_request->data);
   download_sessions[0].file_revision.major_revision = GetUsintFromMessage(&message_router_request->data);
   download_sessions[0].file_revision.minor_revision = GetUsintFromMessage(&message_router_request->data);
-
-  download_sessions[0].file_name.number_of_strings = GetUsintFromMessage(&message_router_request->data);
-  download_sessions[0].file_name.array_of_string_i_structs = CipCalloc(download_sessions[0].file_name.number_of_strings, sizeof(CipStringIStruct));
-  for(size_t i = 0; i < download_sessions[0].file_name.number_of_strings; ++i) {
-    download_sessions[0].file_name.array_of_string_i_structs[i].language_char_1 = GetUsintFromMessage(&message_router_request->data);
-    download_sessions[0].file_name.array_of_string_i_structs[i].language_char_2 = GetUsintFromMessage(&message_router_request->data);
-    download_sessions[0].file_name.array_of_string_i_structs[i].language_char_3 = GetUsintFromMessage(&message_router_request->data);
-    download_sessions[0].file_name.array_of_string_i_structs[i].char_string_struct = GetUsintFromMessage(&message_router_request->data);
-    download_sessions[0].file_name.array_of_string_i_structs[i].character_set = GetUintFromMessage(&message_router_request->data);
-    switch(download_sessions[0].file_name.array_of_string_i_structs[i].char_string_struct){
-      case kCipShortString: {
-        download_sessions[0].file_name.array_of_string_i_structs[i].string = CipCalloc(1, sizeof(CipShortString));
-        CipShortString *const short_string = (CipShortString* const ) download_sessions[0].file_name.array_of_string_i_structs[i].string;
-        CipUsint length = GetUsintFromMessage(&message_router_request->data);
-        SetCipShortStringByData(short_string, length, message_router_request->data);
-        message_router_request->data += length;
-      }
-        break;
-      case kCipString: {
-        download_sessions[0].file_name.array_of_string_i_structs[i].string = CipCalloc(1, sizeof(CipString));
-        CipString *const string = (CipString* const ) download_sessions[0].file_name.array_of_string_i_structs[i].string;
-        CipUint length = GetUintFromMessage(&message_router_request->data);
-        SetCipStringByData(string, length, message_router_request->data);
-        message_router_request->data += length;
-      }
-        break;
-      case kCipString2: {
-        download_sessions[0].file_name.array_of_string_i_structs[i].string = CipCalloc(1, sizeof(CipString2));
-        CipString2 *const string = (CipString2* const ) download_sessions[0].file_name.array_of_string_i_structs[i].string;
-        CipUint length = GetUintFromMessage(&message_router_request->data);
-        SetCipString2ByData(string, length, message_router_request->data);
-        message_router_request->data += length * 2 * sizeof(CipOctet);
-      }
-        break;
-      case kCipStringN: {
-        CipUint size = GetUintFromMessage(&message_router_request->data);
-        CipUint length = GetUintFromMessage(&message_router_request->data);
-
-        download_sessions[0].file_name.array_of_string_i_structs[i].string = CipCalloc(1, sizeof(CipStringN));
-        CipStringN *const string = (CipStringN* const ) download_sessions[0].file_name.array_of_string_i_structs[i].string;
-        SetCipStringNByData(string, length, size, message_router_request->data);
-        message_router_request->data += length * size;
-      }
-        break;
-      default:
-        OPENER_TRACE_ERR("CIP File: No valid String type received!\n");
-    }
-  }
+  //get filename from message
+  CipStringIDecodeFromMessage(&download_sessions[0].file_name, message_router_request);
 
   /* Check for errors */
   if(CIP_FILE_MAX_TRANSFERABLE_SIZE < download_sessions[0].file_size) {
@@ -966,11 +916,143 @@ EipStatus CreateFileObject(unsigned int instance_nr, CipFileObjectValues *const 
   return kEipStatusOk;
 }
 
+/** @brief File Object Delete Instance Data
+ *
+ *  Used for common Delete service to delete instance struct before instance is deleted
+ */
+EipStatus CipFileDeleteInstanceData(
+    CipInstance *RESTRICT const instance,
+    CipMessageRouterRequest *const message_router_request,
+    CipMessageRouterResponse *const message_router_response
+) {
+
+  /*get struct and free elements*/
+  CipFileObjectValues *instance_data_struct = CipFileObjectGetDataStruct(instance);
+
+  CipStringIDelete(&instance_data_struct->instance_name);
+  CipStringIDelete(&instance_data_struct->file_name);
+
+  CipFree(instance_data_struct);
+  instance_data_struct = NULL;
+
+  return kEipStatusOk;
+}
+
+/** @brief File Object PreCreateCallback
+ *
+ *  Used for common Create service before new instance is created
+ *  @See Vol.1, Chapter 5A-42.4.1
+ */
+EipStatus CipFilePreCreateCallback(CipInstance *RESTRICT const instance,
+		CipMessageRouterRequest *const message_router_request,
+		CipMessageRouterResponse *const message_router_response) {
+
+	if (message_router_request->request_data_size > 0) { //check if message contains data
+
+		//check if instance_name is already in use
+		CipOctet *message_data = message_router_request->data; //get message data pointer
+
+		CipStringI *new_instance_name = CipCalloc(1, sizeof(CipStringI));
+		CipStringIDecodeFromMessage(new_instance_name, message_router_request);
+
+		message_router_request->data = message_data; //reset message data pointer
+
+		CipInstance *instances = file_object_class->instances;
+
+		while (NULL != instances) {
+			CipAttributeStruct *attribute = GetCipAttribute(instances, 2); //instance_name
+			CipStringI *name = (CipStringI*) attribute->data;
+
+			if (CipStringICompare(new_instance_name, name)) {
+				// string exists
+				OPENER_TRACE_INFO("Error: instance_name exists already \n");
+				message_router_response->general_status =
+						kCipErrorInvalidParameter;
+				CipStringIDelete(new_instance_name);
+				return kEipStatusError;
+			}
+			instances = instances->next;
+		}
+		CipStringIDelete(new_instance_name);
+		return kEipStatusOk;
+	} else {
+		message_router_response->general_status = kCipErrorNotEnoughData;
+		return kEipStatusError;
+	}
+}
+
+/** @brief File Object PostCreateCallback
+ *
+ *  Used for common Create service after new instance is created
+ *  @See Vol.1, Chapter 5A-42.4.1
+ */
+EipStatus CipFilePostCreateCallback(CipInstance *RESTRICT const new_instance,
+		CipMessageRouterRequest *const message_router_request,
+		CipMessageRouterResponse *const message_router_response) {
+
+	//create new file object struct
+	CipFileObjectValues *file_instance = CipCalloc(1, sizeof(CipFileObjectValues));
+
+	//get instance_name StringI from message - param 1
+	CipStringIDecodeFromMessage(&file_instance->instance_name,
+			message_router_request);
+
+	//get Encoding format from message - param 2
+	file_instance->file_encoding_format = GetUsintFromMessage(&message_router_request->data);
+
+	//default values
+	file_instance->state = kCipFileObjectStateFileEmpty;
+	file_instance->file_revision.major_revision = 0;
+	file_instance->file_revision.minor_revision = 0;
+	file_instance->file_name.number_of_strings = 0; //empty file name
+	file_instance->invocation_method = kCipFileInvocationMethodNotApplicable;
+
+    EipStatus internal_state = CreateFileObject(new_instance->instance_number,
+                                                    file_instance, false);
+
+    new_instance->data = file_instance;
+    CipFileSetDownloadAndClearSupported(file_instance);
+    file_instance->delete_instance_data = &CipFileDeleteInstanceData;
+
+	AddIntToMessage(new_instance->instance_number,
+			&(message_router_response->message));
+	AddSintToMessage(file_instance->invocation_method,
+			&(message_router_response->message));
+
+	return internal_state;
+}
+
+
+/** @brief File Object PreDeleteCallback
+ *
+ *  Used for common Delete service before instance is deleted
+ */
+EipStatus CipFilePreDeleteCallback(
+    CipInstance *RESTRICT const instance,
+    CipMessageRouterRequest *const message_router_request,
+    CipMessageRouterResponse *const message_router_response
+) {
+
+	EipStatus internal_state = kEipStatusOk;
+
+	CipFileObjectValues *file_instance = instance->data;
+
+  if (NULL == file_instance->delete_instance_data) {
+    message_router_response->general_status = kCipErrorInstanceNotDeletable;
+    internal_state =  kEipStatusError;
+  }
+  else{
+	  internal_state = CipFileDeleteInstanceData(instance, message_router_request,
+	                                                    message_router_response);
+  }
+  return internal_state;
+}
+
 void CipFileInitializeClassSettings(CipClass *cip_class) {
   CipClass *meta_class = cip_class->class_instance.cip_class;
 
   InsertAttribute((CipInstance*) cip_class, 1, kCipUint, EncodeCipUint, NULL, (void*) &cip_class->revision, kGetableSingleAndAll); /* revision */
-  InsertAttribute((CipInstance*) cip_class, 2, kCipUint, EncodeCipUint, NULL, (void*) &cip_class->number_of_instances, kGetableSingleAndAll); /*  largest instance number */
+  InsertAttribute((CipInstance*) cip_class, 2, kCipUint, EncodeCipUint, NULL, (void*) &cip_class->max_instance, kGetableSingleAndAll); /*  largest instance number */
   InsertAttribute((CipInstance*) cip_class, 3, kCipUint, EncodeCipUint, NULL, (void*) &cip_class->number_of_instances, kGetableSingleAndAll); /* number of instances currently existing*/
   InsertAttribute((CipInstance*) cip_class, 4, kCipUint, EncodeCipUint, NULL, (void*) &kCipUintZero, kGetableAll); /* optional attribute list - default = 0 */
   InsertAttribute((CipInstance*) cip_class, 5, kCipUint, EncodeCipUint, NULL, (void*) &kCipUintZero, kNotSetOrGetable); /* optional service list - default = 0 */
@@ -979,8 +1061,15 @@ void CipFileInitializeClassSettings(CipClass *cip_class) {
   InsertAttribute((CipInstance*) cip_class, 32, kCipAny, EncodeCipFileObjectDirectory, NULL, &dummy_attribute, kGetableSingle);
 
   InsertService(meta_class, kGetAttributeSingle, &GetAttributeSingle, "GetAttributeSingle");
+  InsertService(meta_class, kCreate, &CipCreateService, "Create");
 
-  cip_class->number_of_instances = kCipFileEDSAndIconFileInstanceNumber; /* Predefined instance for EDS File and Icon File */
+  // add Callback function pointers
+  cip_class->PreCreateCallback = &CipFilePreCreateCallback;
+  cip_class->PostCreateCallback = &CipFilePostCreateCallback;
+  cip_class->PreDeleteCallback = &CipFilePreDeleteCallback;
+
+  cip_class->number_of_instances = 0;
+  cip_class->max_instance = kCipFileEDSAndIconFileInstanceNumber; /* Predefined instance for EDS File and Icon File */
 }
 
 void CipFileSetFileLength(CipFileObjectValues *const eds_file_instance) {
@@ -1062,18 +1151,7 @@ EipStatus CipFileCreateEDSAndIconFileInstance() {
   eds_file_instance->file_access_rule = kCipFileObjectFileAccessRuleReadOnly;
   eds_file_instance->file_encoding_format = kCipFileObjectFileEncodingFormatBinary;
 
-  eds_file_instance->instance_name.number_of_strings = 1;
-  eds_file_instance->instance_name.array_of_string_i_structs = CipCalloc(eds_file_instance->instance_name.number_of_strings, sizeof(CipStringIStruct));
-  eds_file_instance->instance_name.array_of_string_i_structs[0].language_char_1 = 'e';
-  eds_file_instance->instance_name.array_of_string_i_structs[0].language_char_2 = 'n';
-  eds_file_instance->instance_name.array_of_string_i_structs[0].language_char_3 = 'g';
-  eds_file_instance->instance_name.array_of_string_i_structs[0].character_set = kCipStringICharSet_ISO_8859_1_1987;
-  eds_file_instance->instance_name.array_of_string_i_structs[0].char_string_struct = kCipShortString;
-  eds_file_instance->instance_name.array_of_string_i_structs[0].string = CipCalloc(1, sizeof(CipShortString));
-  CipShortString *instance_name_short_string = (CipShortString*) (eds_file_instance->instance_name.array_of_string_i_structs[0].string);
-  instance_name_short_string->length = sizeof(instance_name_string) - 1;
-  instance_name_short_string->string = CipCalloc(sizeof(instance_name_string), sizeof(EipByte));
-  memcpy(instance_name_short_string->string, instance_name_string, sizeof(instance_name_string));
+  CipFileSetInstanceName(eds_file_instance, instance_name_string, sizeof(instance_name_string));
 
   char file_name_string[] = "EDS.txt";
   eds_file_instance->file_name.number_of_strings = 1;
@@ -1095,10 +1173,10 @@ EipStatus CipFileCreateEDSAndIconFileInstance() {
 EipStatus CipFileInit() {
   if(NULL == (file_object_class = CreateCipClass(kCipFileObjectClassCode, 7, /* # class attributes */
   32, /* # highest class attribute number */
-  1, /* # class services */
+  2, /* # class services */
   12, /* # instance attributes */
   12, /* # highest instance attribute number */
-  6, /* # instance services */
+  7, /* # instance services */
   0, /* # instances - zero to suppress creation */
   "File Object", /* # debug name */
   3, /* # class revision */
@@ -1116,19 +1194,26 @@ EipStatus CipFileInit() {
   InsertService(file_object_class, kCipFileObjectInitiateDownloadServiceCode, &CipFileInitiateDownload, "CipFileObjectInitiateDownload");
   InsertService(file_object_class, kCipFileObjectDownloadTransferServiceCode, &CipFileDownloadTransfer, "CipFileObjectDownloadTransfer");
   InsertService(file_object_class, kCipFileObjectClearFileServiceCode, &CipFileClearFile, "CipFileObjectClearFile");
+  InsertService(file_object_class, kDelete, &CipDeleteService, "Delete");
 
-  AddCipInstance(file_object_class, kCipFileEDSAndIconFileInstanceNumber);
+  /*Add static EDS File Instance 200*/
+  CipInstance *new_instance = AddCipInstance(file_object_class, kCipFileEDSAndIconFileInstanceNumber);
   if(kEipStatusError == CreateFileObject(kCipFileEDSAndIconFileInstanceNumber, eds_file_instance, false)) {
     return kEipStatusError;
   }
   CipFileSetDownloadAndClearNotSupported(eds_file_instance);
+  eds_file_instance->delete_instance_data = NULL; // not deletable
+  new_instance->data = eds_file_instance; // data struct pointer for instance
 
-  AddCipInstance(file_object_class, 1);
+  /*Add static File Instance 1*/
+  new_instance = AddCipInstance(file_object_class, 1);
   if(kEipStatusError == CreateFileObject(1, &file_object_values[1], true)) {
     return kEipStatusError;
   }
   CipFileConfigureReadWriteInstance(&file_object_values[1]);
   CipFileSetDownloadAndClearSupported(&file_object_values[1]);
+  file_object_values[1].delete_instance_data = NULL; // not deletable
+  new_instance->data = &file_object_values[1]; // data struct pointer for instance
 
   const char instance_1_name[] = "File Instance 1";
 
@@ -1137,4 +1222,5 @@ EipStatus CipFileInit() {
 
   return CipFileCreateEDSAndIconFileInstance(); /* No instance number needed as this is fixed in the ENIP Spec */
 }
+
 
