@@ -13,16 +13,9 @@ Hence, such objects are provided as separate project. Another benefit of this ap
 
 So, how do you use this? Again a good question! For some time already [OpENer](https://github.com/EIPStackGroup/OpENer) got a "drop-in" CMake-configure mechanism for additional object, when put into the *cip_objects* directory (you probably already asked yourself, whats this empty directory for?)
 
-So the easiest way is to `git clone` this repository into the *cip_objects* directory and hit the `Configure` button in CMake, which should give you a checkbox for this object.
-Now, that the object is included into the compile process, you have to use the following lines in main.c after the call to CipStackInit() to actually use the File Object with [OpENer](https://github.com/EIPStackGroup/OpENer)
+So the easiest way is to `git clone` this repository into the *cip_objects* directory and hit the `Configure` button in CMake, which should give you a checkbox for this object (OpENer_CIP_OBJECT_CIP_FILE_OBJECT).
+Hit `Configure` again and then `Generate`. Now the object is included into the [OpENer](https://github.com/EIPStackGroup/OpENer) compile process.
 
-```
-EipStatus eip_status = CipStackInit(unique_connection_id);
-eip_status = CipFileInit();
-OPENER_ASSERT(kEipStatusOk == eip_status);
-```
-
-also do not forget to add the header `#include "cipfile.h"`
 
 Contributing to OpENer File Object:
 -----------------------
