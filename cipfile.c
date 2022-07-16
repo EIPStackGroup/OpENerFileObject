@@ -17,7 +17,7 @@
 #include "cipstring.h"
 #include "cipstringi.h"
 
-#define STATIC_FILE_OBJECT_NUMBER_OF_INSTANCES 2
+#define STATIC_FILE_OBJECT_NUMBER_OF_INSTANCES 1
 #define CIP_FILE_OBJECT_DEFAULT_TIMEOUT 10U
 
 static CipClass *file_object_class = NULL;
@@ -174,20 +174,20 @@ void CipFileEncodeFileRevision(const void *const data, ENIPMessage *const outgoi
 }
 
 void EncodeCipFileObjectDirectory(const void *const data, ENIPMessage *const outgoing_message) {
-  const CipInstance *const class_instance = GetCipInstance(file_object_class, 0); /* Get class instance */
-  CipAttributeStruct *instance_number = GetCipAttribute(class_instance, 3);
-  CipUint number_of_instances = *(CipUint*) instance_number->data;
-  for(CipUint i = 1; i <= number_of_instances; ++i) {
-    CipInstance *instance = GetCipInstance(file_object_class, i); /* Get class instance */
-    if(NULL == instance) {
-      continue;
-    }
-    EncodeCipUint(&i, outgoing_message);
-    CipAttributeStruct *instance_name = GetCipAttribute(instance, 2);
+
+  CipClass *const class = GetCipClass(kCipFileObjectClassCode);
+  CipInstance *instances = class->instances; /* pointer to first instance */
+  while (NULL != instances)  /* as long as pointer in not NULL */
+  {
+    EncodeCipUint(&instances->instance_number, outgoing_message);
+    CipAttributeStruct *instance_name = GetCipAttribute(instances, 2);
     EncodeCipStringI((CipStringIStruct*) instance_name->data, outgoing_message);
-    CipAttributeStruct *file_name = GetCipAttribute(instance, 4);
+    CipAttributeStruct *file_name = GetCipAttribute(instances, 4);
     EncodeCipStringI((CipStringIStruct*) file_name->data, outgoing_message);
+
+    instances = instances->next;
   }
+
 }
 
 void GenerateResponseHeader(const CipFileInitiateGeneralStatusCode general_status, const CipUsint additional_status_size, const CipUint additional_status_code,
@@ -1204,21 +1204,6 @@ EipStatus CipFileInit() {
   CipFileSetDownloadAndClearNotSupported(eds_file_instance);
   eds_file_instance->delete_instance_data = NULL; // not deletable
   new_instance->data = eds_file_instance; // data struct pointer for instance
-
-  /*Add static File Instance 1*/
-  new_instance = AddCipInstance(file_object_class, 1);
-  if(kEipStatusError == CreateFileObject(1, &file_object_values[1], true)) {
-    return kEipStatusError;
-  }
-  CipFileConfigureReadWriteInstance(&file_object_values[1]);
-  CipFileSetDownloadAndClearSupported(&file_object_values[1]);
-  file_object_values[1].delete_instance_data = NULL; // not deletable
-  new_instance->data = &file_object_values[1]; // data struct pointer for instance
-
-  const char instance_1_name[] = "File Instance 1";
-
-  CipFileSetInstanceName(&file_object_values[1], instance_1_name, sizeof(instance_1_name));
-  CipStringIDelete(&file_object_values[1].file_name);
 
   return CipFileCreateEDSAndIconFileInstance(); /* No instance number needed as this is fixed in the ENIP Spec */
 }
