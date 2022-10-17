@@ -1205,6 +1205,9 @@ EipStatus CipFileInit() {
   eds_file_instance->delete_instance_data = NULL; // not deletable
   new_instance->data = eds_file_instance; // data struct pointer for instance
 
+  /* Register timeout checker function in opener */
+  RegisterTimeoutChecker(CipFileSessionTimerCheck);
+
   return CipFileCreateEDSAndIconFileInstance(); /* No instance number needed as this is fixed in the ENIP Spec */
 }
 
