@@ -1007,12 +1007,12 @@ EipStatus CipFilePostCreateCallback(CipInstance *RESTRICT const new_instance,
 	file_instance->file_name.number_of_strings = 0; //empty file name
 	file_instance->invocation_method = kCipFileInvocationMethodNotApplicable;
 
-    EipStatus internal_state = CreateFileObject(new_instance->instance_number,
-                                                    file_instance, false);
+  EipStatus internal_state = CreateFileObject(new_instance->instance_number,
+                                                  file_instance, false);
 
-    new_instance->data = file_instance;
-    CipFileSetDownloadAndClearSupported(file_instance);
-    file_instance->delete_instance_data = &CipFileDeleteInstanceData;
+  new_instance->data = file_instance;
+  CipFileSetDownloadAndClearSupported(file_instance);
+  file_instance->delete_instance_data = &CipFileDeleteInstanceData;
 
 	AddIntToMessage(new_instance->instance_number,
 			&(message_router_response->message));
@@ -1168,6 +1168,37 @@ EipStatus CipFileCreateEDSAndIconFileInstance() {
   memcpy(file_name_short_string->string, file_name_string, sizeof(file_name_string));
 
   return kEipStatusOk;
+}
+
+/** @brief creates empty file object instance
+ *
+ * @param instance_name_string name of the created file object instance
+ */
+CipInstance CipFileCreateInstance(char *instance_name_string) {
+  CipInstance *new_instance = AddCipInstances(file_object_class, 1);
+
+  // create new file object struct
+  CipFileObjectValues *file_instance =
+      CipCalloc(1, sizeof(CipFileObjectValues));
+
+  CipFileSetInstanceName(file_instance, instance_name_string,
+                         strlen(instance_name_string) + 1);
+
+  // default values
+  file_instance->state = kCipFileObjectStateFileEmpty;
+  file_instance->file_revision.major_revision = 0;
+  file_instance->file_revision.minor_revision = 0;
+  file_instance->file_name.number_of_strings = 0;  // empty file name
+  file_instance->invocation_method = kCipFileInvocationMethodNotApplicable;
+  file_instance->file_encoding_format = kCipFileObjectFileEncodingFormatBinary;
+
+  CreateFileObject(new_instance->instance_number, file_instance, false);
+
+  new_instance->data = file_instance;
+  CipFileSetDownloadAndClearSupported(file_instance);
+  file_instance->delete_instance_data = &CipFileDeleteInstanceData;
+
+  return *new_instance;
 }
 
 EipStatus CipFileInit() {

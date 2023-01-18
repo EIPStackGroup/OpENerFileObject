@@ -95,4 +95,6 @@ EipStatus CipFileInit(void);
 
 void CipFileSessionTimerCheck(const MilliSeconds elapsed_time);
 
+CipInstance CipFileCreateInstance(char *instance_name_string);
+
 #endif /* OPENER_CIPFILE_H_ */
