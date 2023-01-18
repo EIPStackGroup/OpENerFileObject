@@ -920,11 +920,7 @@ EipStatus CreateFileObject(unsigned int instance_nr, CipFileObjectValues *const 
  *
  *  Used for common Delete service to delete instance struct before instance is deleted
  */
-EipStatus CipFileDeleteInstanceData(
-    CipInstance *RESTRICT const instance,
-    CipMessageRouterRequest *const message_router_request,
-    CipMessageRouterResponse *const message_router_response
-) {
+EipStatus CipFileDeleteInstanceData(CipInstance *RESTRICT const instance) {
 
   /*get struct and free elements*/
   CipFileObjectValues *instance_data_struct = CipFileObjectGetDataStruct(instance);
@@ -1042,8 +1038,7 @@ EipStatus CipFilePreDeleteCallback(
     internal_state =  kEipStatusError;
   }
   else{
-	  internal_state = CipFileDeleteInstanceData(instance, message_router_request,
-	                                                    message_router_response);
+	  internal_state = CipFileDeleteInstanceData(instance);
   }
   return internal_state;
 }
