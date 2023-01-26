@@ -1554,7 +1554,7 @@ void CipFileSetInstanceName(CipFileObjectValues *const file_instance,
                             size_t instance_name_string_size) {
   file_instance->instance_name.number_of_strings = 1;
   file_instance->instance_name.array_of_string_i_structs = CipCalloc(
-     file_instance->instance_name.number_of_strings, sizeof(CipStringIStruct) );
+    file_instance->instance_name.number_of_strings, sizeof(CipStringIStruct) );
   file_instance->instance_name.array_of_string_i_structs[0].language_char_1 =
     'e';
   file_instance->instance_name.array_of_string_i_structs[0].language_char_2 =
@@ -1566,7 +1566,7 @@ void CipFileSetInstanceName(CipFileObjectValues *const file_instance,
   file_instance->instance_name.array_of_string_i_structs[0].char_string_struct =
     kCipShortString;
   file_instance->instance_name.array_of_string_i_structs[0].string = CipCalloc(
-     1, sizeof(CipShortString) );
+    1, sizeof(CipShortString) );
   CipShortString *instance_name_short_string =
     (CipShortString *) (file_instance->instance_name.array_of_string_i_structs[0
                         ].
@@ -1637,7 +1637,7 @@ EipStatus CipFileCreateEDSAndIconFileInstance() {
   char file_name_string[] = "EDS.txt";
   eds_file_instance->file_name.number_of_strings = 1;
   eds_file_instance->file_name.array_of_string_i_structs = CipCalloc(
-     eds_file_instance->file_name.number_of_strings, sizeof(CipStringIStruct) );
+    eds_file_instance->file_name.number_of_strings, sizeof(CipStringIStruct) );
   eds_file_instance->file_name.array_of_string_i_structs[0].language_char_1 =
     'e';
   eds_file_instance->file_name.array_of_string_i_structs[0].language_char_2 =
@@ -1649,7 +1649,7 @@ EipStatus CipFileCreateEDSAndIconFileInstance() {
   eds_file_instance->file_name.array_of_string_i_structs[0].char_string_struct =
     kCipShortString;
   eds_file_instance->file_name.array_of_string_i_structs[0].string = CipCalloc(
-     1, sizeof(CipShortString) );
+    1, sizeof(CipShortString) );
   CipShortString *file_name_short_string =
     (CipShortString *) (eds_file_instance->file_name.array_of_string_i_structs[0
                         ].
