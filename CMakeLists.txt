@@ -28,6 +28,20 @@ set(OPENER_DATA_FOLDER "${OpENer_SOURCE_DIR}/../data")
 find_file( FILE_OBJECT_EDS_FILE_LOCATION NAMES opener_sample_app.eds PATHS ${OPENER_DATA_FOLDER} NO_DEFAULT_PATH  DOC "EDS File to be provided by File Object Instance 0xC8" )
 add_definitions(-DFILE_OBJECT_EDS_FILE_LOCATION=\"${FILE_OBJECT_EDS_FILE_LOCATION}\")
 
+###############################################################
+# Certificate file for Default Device Certificate            # TODO: move file to security direcory?
+###############################################################
+set(OPENER_DATA_FOLDER "${OpENer_SOURCE_DIR}/../data")
+find_file( FILE_OBJECT_CERTIFICATE_FILE_LOCATION NAMES test-cert.pem PATHS ${OPENER_DATA_FOLDER} NO_DEFAULT_PATH  DOC "Default Device Certificate File" )
+add_definitions(-DFILE_OBJECT_CERTIFICATE_FILE_LOCATION=\"${FILE_OBJECT_CERTIFICATE_FILE_LOCATION}\")
+
+###############################################################
+# CSR file for static File Object Instance                    # TODO: remove - for testing
+###############################################################
+set(OPENER_DATA_FOLDER "${OpENer_SOURCE_DIR}/../data")
+find_file( FILE_OBJECT_CSR_FILE_LOCATION NAMES test-CSR.pem PATHS ${OPENER_DATA_FOLDER} NO_DEFAULT_PATH  DOC "Test CSR File" )
+add_definitions(-DFILE_OBJECT_CSR_FILE_LOCATION=\"${FILE_OBJECT_CSR_FILE_LOCATION}\")
+
 ##################################
 # Set source for library         #
 ##################################
