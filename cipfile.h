@@ -97,7 +97,8 @@ void CipFileSessionTimerCheck(const MilliSeconds elapsed_time);
 
 CipInstance CipFileCreateInstance(char *instance_name_string);
 
-EipStatus CipFileCreateCertificateFileInstance(CipInstance *file_object_instance);
+EipStatus CipFileCreateCertificateFileInstance(
+  CipInstance *file_object_instance);
 
 EipStatus CipFileCreateCSRFileInstance(CipInstance *file_object_instance);
 

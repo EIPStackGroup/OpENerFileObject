@@ -1663,10 +1663,13 @@ EipStatus CipFileCreateEDSAndIconFileInstance() {
   return kEipStatusOk;
 }
 
-EipStatus CipFileCreateCertificateFileInstance(CipInstance *file_object_instance) {
+EipStatus CipFileCreateCertificateFileInstance(
+  CipInstance *file_object_instance) {
   CipFileObjectValues *certificate_file_instance = file_object_instance->data;
   const char instance_name_string[] = "Default Device Certificate";
-  certificate_file_instance->file_handle = fopen(FILE_OBJECT_CERTIFICATE_FILE_LOCATION, "rb");
+  certificate_file_instance->file_handle = fopen(
+    FILE_OBJECT_CERTIFICATE_FILE_LOCATION,
+    "rb");
   if(NULL == certificate_file_instance->file_handle) {
     OPENER_TRACE_ERR("File does not exist\n");
     return kEipStatusError;
@@ -1676,9 +1679,11 @@ EipStatus CipFileCreateCertificateFileInstance(CipInstance *file_object_instance
   CipFileSetChecksum(certificate_file_instance);
 
   certificate_file_instance->file_format_version = 1;
-  certificate_file_instance->invocation_method = kCipFileInvocationMethodNotApplicable;
+  certificate_file_instance->invocation_method =
+    kCipFileInvocationMethodNotApplicable;
   certificate_file_instance->file_save_parameters = 0;
-  certificate_file_instance->file_access_rule = kCipFileObjectFileAccessRuleReadOnly;
+  certificate_file_instance->file_access_rule =
+    kCipFileObjectFileAccessRuleReadOnly;
   certificate_file_instance->file_encoding_format =
     kCipFileObjectFileEncodingFormatBinary;
 
@@ -1688,21 +1693,29 @@ EipStatus CipFileCreateCertificateFileInstance(CipInstance *file_object_instance
   char file_name_string[] = "test-cert.pem"; //TODO: update certificate
   certificate_file_instance->file_name.number_of_strings = 1;
   certificate_file_instance->file_name.array_of_string_i_structs = CipCalloc(
-    certificate_file_instance->file_name.number_of_strings, sizeof(CipStringIStruct) );
-  certificate_file_instance->file_name.array_of_string_i_structs[0].language_char_1 =
+    certificate_file_instance->file_name.number_of_strings,
+    sizeof(CipStringIStruct) );
+  certificate_file_instance->file_name.array_of_string_i_structs[0].
+  language_char_1 =
     'e';
-  certificate_file_instance->file_name.array_of_string_i_structs[0].language_char_2 =
+  certificate_file_instance->file_name.array_of_string_i_structs[0].
+  language_char_2 =
     'n';
-  certificate_file_instance->file_name.array_of_string_i_structs[0].language_char_3 =
+  certificate_file_instance->file_name.array_of_string_i_structs[0].
+  language_char_3 =
     'g';
-  certificate_file_instance->file_name.array_of_string_i_structs[0].character_set =
+  certificate_file_instance->file_name.array_of_string_i_structs[0].
+  character_set =
     kCipStringICharSet_ISO_8859_1_1987;
-  certificate_file_instance->file_name.array_of_string_i_structs[0].char_string_struct =
+  certificate_file_instance->file_name.array_of_string_i_structs[0].
+  char_string_struct =
     kCipShortString;
-  certificate_file_instance->file_name.array_of_string_i_structs[0].string = CipCalloc(
-    1, sizeof(CipShortString) );
+  certificate_file_instance->file_name.array_of_string_i_structs[0].string =
+    CipCalloc(
+      1, sizeof(CipShortString) );
   CipShortString *file_name_short_string =
-    (CipShortString *) (certificate_file_instance->file_name.array_of_string_i_structs[0
+    (CipShortString *) (certificate_file_instance->file_name.
+                        array_of_string_i_structs[0
                         ].
                         string);
   file_name_short_string->length = sizeof(file_name_string) - 1;
@@ -1717,7 +1730,8 @@ EipStatus CipFileCreateCertificateFileInstance(CipInstance *file_object_instance
 EipStatus CipFileCreateCSRFileInstance(CipInstance *file_object_instance) {
   CipFileObjectValues *certificate_file_instance = file_object_instance->data;
   const char instance_name_string[] = "Certificate Signing Request";
-  certificate_file_instance->file_handle = fopen(FILE_OBJECT_CSR_FILE_LOCATION, "rb"); //TODO: use created file location
+  certificate_file_instance->file_handle = fopen(FILE_OBJECT_CSR_FILE_LOCATION,
+                                                 "rb");                                //TODO: use created file location
   if(NULL == certificate_file_instance->file_handle) {
     OPENER_TRACE_ERR("File does not exist\n");
     return kEipStatusError;
@@ -1727,9 +1741,11 @@ EipStatus CipFileCreateCSRFileInstance(CipInstance *file_object_instance) {
   CipFileSetChecksum(certificate_file_instance);
 
   certificate_file_instance->file_format_version = 1;
-  certificate_file_instance->invocation_method = kCipFileInvocationMethodNotApplicable;
+  certificate_file_instance->invocation_method =
+    kCipFileInvocationMethodNotApplicable;
   certificate_file_instance->file_save_parameters = 0;
-  certificate_file_instance->file_access_rule = kCipFileObjectFileAccessRuleReadOnly;
+  certificate_file_instance->file_access_rule =
+    kCipFileObjectFileAccessRuleReadOnly;
   certificate_file_instance->file_encoding_format =
     kCipFileObjectFileEncodingFormatBinary;
 
@@ -1739,21 +1755,29 @@ EipStatus CipFileCreateCSRFileInstance(CipInstance *file_object_instance) {
   char file_name_string[] = "test-CSR.pem"; //TODO: use created file
   certificate_file_instance->file_name.number_of_strings = 1;
   certificate_file_instance->file_name.array_of_string_i_structs = CipCalloc(
-    certificate_file_instance->file_name.number_of_strings, sizeof(CipStringIStruct) );
-  certificate_file_instance->file_name.array_of_string_i_structs[0].language_char_1 =
+    certificate_file_instance->file_name.number_of_strings,
+    sizeof(CipStringIStruct) );
+  certificate_file_instance->file_name.array_of_string_i_structs[0].
+  language_char_1 =
     'e';
-  certificate_file_instance->file_name.array_of_string_i_structs[0].language_char_2 =
+  certificate_file_instance->file_name.array_of_string_i_structs[0].
+  language_char_2 =
     'n';
-  certificate_file_instance->file_name.array_of_string_i_structs[0].language_char_3 =
+  certificate_file_instance->file_name.array_of_string_i_structs[0].
+  language_char_3 =
     'g';
-  certificate_file_instance->file_name.array_of_string_i_structs[0].character_set =
+  certificate_file_instance->file_name.array_of_string_i_structs[0].
+  character_set =
     kCipStringICharSet_ISO_8859_1_1987;
-  certificate_file_instance->file_name.array_of_string_i_structs[0].char_string_struct =
+  certificate_file_instance->file_name.array_of_string_i_structs[0].
+  char_string_struct =
     kCipShortString;
-  certificate_file_instance->file_name.array_of_string_i_structs[0].string = CipCalloc(
-    1, sizeof(CipShortString) );
+  certificate_file_instance->file_name.array_of_string_i_structs[0].string =
+    CipCalloc(
+      1, sizeof(CipShortString) );
   CipShortString *file_name_short_string =
-    (CipShortString *) (certificate_file_instance->file_name.array_of_string_i_structs[0
+    (CipShortString *) (certificate_file_instance->file_name.
+                        array_of_string_i_structs[0
                         ].
                         string);
   file_name_short_string->length = sizeof(file_name_string) - 1;
